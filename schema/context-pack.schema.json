@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/liuliuyun/project-kb-core/schema/context-pack.schema.json",
+  "title": "project-kb context pack",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "budget", "text", "items"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "budget": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "text": {
+      "type": "string"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "priority", "content"],
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

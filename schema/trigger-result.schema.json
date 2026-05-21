@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/liuliuyun/project-kb-core/schema/trigger-result.schema.json",
+  "title": "project-kb trigger result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "proposal_id",
+    "proposal_hash",
+    "worktree_diff_hash",
+    "applied_hash",
+    "needs_knowledge_update",
+    "proposal_status",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "proposal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "proposal_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "worktree_diff_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "applied_hash": {
+      "type": "string"
+    },
+    "needs_knowledge_update": {
+      "type": "boolean"
+    },
+    "proposal_status": {
+      "enum": ["proposed", "blocked_sensitive", "applied"]
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

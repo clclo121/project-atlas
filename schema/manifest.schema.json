@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/liuliuyun/project-kb-core/schema/manifest.schema.json",
+  "title": "project-kb manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "max_context_chars", "required_files", "evidence_dir"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "max_context_chars": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "required_files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evidence_dir": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

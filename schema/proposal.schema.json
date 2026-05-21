@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/liuliuyun/project-kb-core/schema/proposal.schema.json",
+  "title": "project-kb proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "proposal_id",
+    "schema_version",
+    "base_commit",
+    "worktree_diff_hash",
+    "source_files",
+    "target_files",
+    "operations",
+    "created_at",
+    "expires_at",
+    "reason",
+    "sensitive_scan_result",
+    "proposal_status",
+    "proposal_hash"
+  ],
+  "properties": {
+    "proposal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schema_version": {
+      "const": "1.0"
+    },
+    "base_commit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "worktree_diff_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "source_files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "target_files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^knowledge/"
+      }
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "path", "content", "target_current_hash"],
+        "properties": {
+          "type": {
+            "const": "replace_file"
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^knowledge/"
+          },
+          "content": {
+            "type": "string"
+          },
+          "target_current_hash": {
+            "type": "string",
+            "pattern": "^sha256:([a-f0-9]{64}|missing)$"
+          }
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sensitive_scan_result": {
+      "enum": ["passed", "blocked"]
+    },
+    "proposal_status": {
+      "enum": ["proposed", "blocked_sensitive", "applied"]
+    },
+    "proposal_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "applied_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "applied_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

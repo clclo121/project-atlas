@@ -1,0 +1,9 @@
+node_modules/
+dist/
+node_modules/
+.idea/
+*.tgz
+.project-kb/
+*.log
+.DS_Store
+/docs/development-log/

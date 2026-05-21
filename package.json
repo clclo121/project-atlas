@@ -1,0 +1,41 @@
+{
+  "name": "project-kb-core",
+  "version": "0.1.0",
+  "description": "Git-first project knowledge base governance CLI for AI coding agents.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "project-kb": "./dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liuliuyun/project-kb-core.git"
+  },
+  "keywords": [
+    "ai-coding",
+    "knowledge-base",
+    "opencode",
+    "cli",
+    "git"
+  ],
+  "files": [
+    "dist",
+    "adapters",
+    "schema",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint:types": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run build && node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  }
+}
