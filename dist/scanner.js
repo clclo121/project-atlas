@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { changedFiles, currentCommit, runGit, walkFiles, worktreeHash } from "./utils.js";
-export function scanRepo(repo, mode) {
+export function scanRepo(repo, mode, externalEvidence = []) {
     const allFiles = walkFiles(repo);
     const scopedFiles = mode === "changed" ? changedFiles(repo) : allFiles;
     const entries = {
@@ -44,7 +44,7 @@ export function scanRepo(repo, mode) {
         },
         candidates: detectCandidates(scopedFiles),
         sensitive_config_findings: sensitiveFindings(repo, scopedFiles.length ? scopedFiles : allFiles),
-        external_evidence: [],
+        external_evidence: externalEvidence,
     };
 }
 function parsePom(repo, rel) {

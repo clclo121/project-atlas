@@ -171,15 +171,21 @@
 - 不同模板生成不同的目录说明和示例问题。
 - 默认仍使用 `generic-service` 或通用模板。
 
-## P2 开源生态能力
+## P2 开源生态能力（已完成）
+
+完成状态：
+
+- 2026-05-21 已补齐本地 stdio MCP server、Claude Code/Cursor/Continue adapter 说明和外部代码证据导入。
+- 详细实现记录见 `docs/development-log/2026-05-21-p2-ecosystem.md`。
 
 ### 9. MCP server
 
 当前状态：
 
-- 明确不属于第一版。
+- 已提供 `project-kb-mcp` 本地 stdio MCP server。
+- MCP server 只暴露安全工具，不暴露 apply。
 
-待开发：
+完成内容：
 
 - 只暴露 `scan`、`context`、`stale`、`propose`、`review-summary`。
 - 不暴露 `apply`。
@@ -195,8 +201,9 @@
 当前状态：
 
 - 已有 OpenCode 示例适配层。
+- 已新增 Claude Code、Cursor 和 Continue 适配说明。
 
-待开发：
+完成内容：
 
 - 增加 Claude Code 适配说明。
 - 增加 Continue context provider 示例。
@@ -211,10 +218,11 @@
 
 当前状态：
 
-- `scan` 预留了 `external_evidence`。
-- 未接入 Serena、Codebase-Memory 或 Aider Repo Map。
+- `scan` 支持通过 `--external-evidence-file` 导入 `external_evidence`。
+- `propose` 支持从 `updates-file` 和 `--external-evidence-file` 合并外部证据。
+- 未把 Serena、Codebase-Memory 或 Aider Repo Map 作为硬依赖。
 
-待开发：
+完成内容：
 
 - 设计 `external_evidence` 标准结构。
 - 支持从外部 JSON 文件导入代码图谱或 repo map 结果。

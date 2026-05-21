@@ -133,7 +133,8 @@ project-kb review-summary --repo <repo> --proposal-id <id>
 - 必须识别常见 Java 入口，包括 controller、service、feign、tasks、mq、remote、config。
 - 必须列出 `knowledge/` 覆盖情况。
 - 必须对敏感配置只输出规则类型和文件路径，不输出原文值。
-- 第一版只预留 `external_evidence`，不接入代码图谱。
+- 支持通过 `--external-evidence-file` 导入外部代码证据。
+- 不把外部代码图谱工具作为运行时硬依赖。
 
 ### 5.3 `context`
 
@@ -158,6 +159,7 @@ project-kb review-summary --repo <repo> --proposal-id <id>
 - 禁止通过 proposal 修改 `knowledge/manifest.json`。
 - 禁止通过 proposal 写入 `knowledge/assets/**`。
 - 必须写入 `proposal.json`、`trigger-result.json`、`latest.json` 和 `dry-run.diff`。
+- 必须支持保存外部代码证据。
 - 命中敏感规则时，proposal 状态必须为 `blocked_sensitive`，并且不能保存敏感原文。
 
 ### 5.6 `apply`
@@ -173,7 +175,7 @@ project-kb review-summary --repo <repo> --proposal-id <id>
 ### 5.7 `review-summary`
 
 - 必须输出 Markdown。
-- 必须包含 proposal id、状态、原因、source files、target files、敏感扫描结果、stale 状态和下一步命令。
+- 必须包含 proposal id、状态、原因、source files、target files、外部证据、敏感扫描结果、stale 状态和下一步命令。
 - 默认读取 `latest.json`。
 - 支持通过 `--proposal-id` 指定 proposal。
 
@@ -184,13 +186,21 @@ project-kb review-summary --repo <repo> --proposal-id <id>
 - 不允许提供 apply tool。
 - 必须提示用户真实写入要回到终端执行。
 
+### 5.9 MCP 和其他 adapter
+
+- `project-kb-mcp` 只提供本地 stdio MCP server。
+- MCP 只能暴露 `scan`、`context`、`stale`、`propose`、`review-summary`。
+- MCP 不允许暴露 apply tool。
+- Claude Code、Cursor、Continue adapter 只作为示例说明。
+- 所有 adapter 的真实写入都必须回到终端执行。
+
 ## 6. 非目标
 
 - 第一版不做 Web UI。
-- 第一版不做 MCP server。
+- 第一版不做远程 HTTP MCP server。
 - 第一版不做语义检索。
 - 第一版不做代码知识图谱。
-- 第一版不做多 Agent 全量适配。
+- 第一版不做多 Agent 深度适配。
 - 第一版不做云端同步。
 - 第一版不做自动 apply。
 - 第一版不承诺生成高质量长文档，只提供治理框架和证据协议。

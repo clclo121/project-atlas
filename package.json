@@ -5,7 +5,8 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "project-kb": "./dist/index.js"
+    "project-kb": "./dist/index.js",
+    "project-kb-mcp": "./dist/mcp.js"
   },
   "repository": {
     "type": "git",
@@ -33,10 +34,15 @@
     "test": "npm run build && node --test test/*.test.mjs"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "^5.8.0"
+  },
+  "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
+    "@modelcontextprotocol/server": "^2.0.0-alpha.2",
+    "zod": "^4.4.3"
   }
 }

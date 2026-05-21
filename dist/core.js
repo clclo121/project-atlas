@@ -7,10 +7,10 @@ import { scanRepo } from "./scanner.js";
 import { currentCommit, ensureDir, ensureEvidenceIgnored, fileHash, proposalRoot, readJson, removeFileIfExists, replaceFileAtomic, repoFileHash, resolveRepo, sha256Text, updateGitignore, validateKnowledgeTarget, walkFiles, worktreeHash, writeIfMissing, writeJson, } from "./utils.js";
 const commandOptions = {
     init: ["repo", "template"],
-    scan: ["repo", "mode"],
+    scan: ["repo", "mode", "external-evidence-file"],
     context: ["repo", "query", "source-file", "budget", "max-context-chars", "format"],
     stale: ["repo", "format"],
-    propose: ["repo", "target", "content-file", "updates-file", "reason", "inherit-source-metadata"],
+    propose: ["repo", "target", "content-file", "updates-file", "reason", "inherit-source-metadata", "external-evidence-file"],
     apply: ["repo", "proposal-id", "confirm"],
     "review-summary": ["repo", "proposal-id"],
     cleanup: ["repo", "force"],
@@ -89,14 +89,15 @@ const commandHelp = {
         "  project-kb init --repo /path/to/repo --template java-backend",
     ].join("\n"),
     scan: [
-        "Usage: project-kb scan --repo <repo> --mode <full|changed>",
+        "Usage: project-kb scan --repo <repo> --mode <full|changed> [--external-evidence-file <file>]",
         "",
         "Options:",
         "  --repo <path>       Git repository path. Defaults to current directory.",
         "  --mode <value>      Scan mode. Use full or changed. Defaults to full.",
+        "  --external-evidence-file <file>  JSON file with external repo map or code graph evidence.",
         "",
         "Example:",
-        "  project-kb scan --repo /path/to/repo --mode changed",
+        "  project-kb scan --repo /path/to/repo --mode changed --external-evidence-file evidence.json",
     ].join("\n"),
     context: [
         "Usage: project-kb context --repo <repo> [--query <text>] [--source-file <path>] [--budget <chars>] [--format <markdown|json>]",
@@ -130,11 +131,12 @@ const commandHelp = {
         "  --updates-file <file>  JSON file with source_files and updates.",
         "  --target <path>        Single target under knowledge/**.",
         "  --content-file <file>  Markdown content for a single target.",
+        "  --external-evidence-file <file>  JSON file with external repo map or code graph evidence.",
         "  --reason <text>        Human-readable proposal reason.",
         "  --inherit-source-metadata  Merge existing target source_files into the proposal.",
         "",
         "Example:",
-        "  project-kb propose --repo /path/to/repo --updates-file updates.json --reason \"update project knowledge\"",
+        "  project-kb propose --repo /path/to/repo --updates-file updates.json --external-evidence-file evidence.json --reason \"update project knowledge\"",
     ].join("\n"),
     apply: [
         "Usage: project-kb apply --repo <repo> --proposal-id <id> --confirm",
@@ -229,6 +231,20 @@ export async function runCli(argv) {
             throw new Error(`Unknown command: ${parsed.command || "(empty)"}`);
     }
 }
+export async function runCliCapture(argv) {
+    const originalLog = console.log;
+    const lines = [];
+    console.log = (...args) => {
+        lines.push(args.map((arg) => (typeof arg === "string" ? arg : String(arg))).join(" "));
+    };
+    try {
+        await runCli(argv);
+        return lines.length ? `${lines.join("\n")}\n` : "";
+    }
+    finally {
+        console.log = originalLog;
+    }
+}
 function cmdInit(flags) {
     const repo = resolveRepo(stringFlag(flags, "repo", "."));
     const templateName = templateFlag(flags);
@@ -279,7 +295,8 @@ function cmdScan(flags) {
     if (mode !== "full" && mode !== "changed") {
         throw usageError("scan", "--mode must be full or changed");
     }
-    console.log(JSON.stringify(scanRepo(repo, mode), null, 2));
+    const externalEvidence = loadExternalEvidence(repo, optionalStringFlag(flags, "external-evidence-file"));
+    console.log(JSON.stringify(scanRepo(repo, mode, externalEvidence), null, 2));
 }
 function cmdContext(flags) {
     const repo = resolveRepo(stringFlag(flags, "repo", "."));
@@ -321,11 +338,12 @@ function cmdPropose(flags) {
     const updatesFile = optionalStringFlag(flags, "updates-file");
     const reason = stringFlag(flags, "reason", "Knowledge update proposal");
     const inheritSourceMetadata = Boolean(flags["inherit-source-metadata"]);
+    const externalEvidence = loadExternalEvidence(repo, optionalStringFlag(flags, "external-evidence-file"));
     if (target && updatesFile) {
         throw new Error("--target and --updates-file cannot be used together");
     }
     const inputData = loadUpdateInput(repo, target, contentFile, updatesFile);
-    const proposal = createProposal(repo, inputData, reason, inheritSourceMetadata);
+    const proposal = createProposal(repo, { ...inputData, external_evidence: [...(inputData.external_evidence ?? []), ...externalEvidence] }, reason, inheritSourceMetadata);
     console.log(`proposal_id: ${proposal.proposal_id}`);
     console.log(`proposal_status: ${proposal.proposal_status}`);
     console.log(`proposal_hash: ${proposal.proposal_hash}`);
@@ -404,6 +422,9 @@ function cmdReviewSummary(flags) {
         "",
         "## Target Files",
         ...listOrNone(proposal.target_files),
+        "",
+        "## External Evidence",
+        ...externalEvidenceLines(proposal.external_evidence ?? []),
         "",
         "## Sensitive Scan",
         `- result: ${proposal.sensitive_scan_result}`,
@@ -581,6 +602,7 @@ function createProposal(repo, inputData, reason, inheritSourceMetadata = false) 
         created_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         reason,
+        external_evidence: inputData.external_evidence ?? [],
         sensitive_scan_result: status === "blocked_sensitive" ? "blocked" : "passed",
         proposal_status: status,
     };
@@ -597,12 +619,75 @@ function loadUpdateInput(repo, target, contentFile, updatesFile) {
         if (!Array.isArray(parsed.updates) || parsed.updates.length === 0) {
             throw new Error("updates-file must contain a non-empty updates array.");
         }
-        return { source_files: parsed.source_files ?? [], updates: parsed.updates };
+        return { source_files: parsed.source_files ?? [], external_evidence: validateExternalEvidenceItems(parsed.external_evidence ?? []), updates: parsed.updates };
     }
     if (!target || !contentFile) {
         throw new Error("provide --updates-file or --target with --content-file");
     }
-    return { source_files: [], updates: [{ target, content: readFileSync(path.resolve(repo, contentFile), "utf8") }] };
+    return { source_files: [], external_evidence: [], updates: [{ target, content: readFileSync(path.resolve(repo, contentFile), "utf8") }] };
+}
+function loadExternalEvidence(repo, evidenceFile) {
+    if (!evidenceFile) {
+        return [];
+    }
+    let parsed;
+    try {
+        parsed = JSON.parse(readFileSync(path.resolve(repo, evidenceFile), "utf8"));
+    }
+    catch {
+        throw new Error("external evidence file must be valid JSON.");
+    }
+    if (!isRecord(parsed)) {
+        throw new Error("external evidence file must contain a JSON object.");
+    }
+    if (parsed.schema_version !== "1.0") {
+        throw new Error("external evidence schema_version must be 1.0.");
+    }
+    return validateExternalEvidenceItems(parsed.external_evidence);
+}
+function validateExternalEvidenceItems(value) {
+    if (!Array.isArray(value)) {
+        throw new Error("external_evidence must be an array.");
+    }
+    return value.map((raw) => {
+        if (!isRecord(raw)) {
+            throw new Error("external_evidence item must be an object.");
+        }
+        const source = requiredString(raw, "source");
+        const sourceType = requiredString(raw, "source_type");
+        const itemPath = requiredString(raw, "path");
+        const item = {
+            source,
+            source_type: sourceType,
+            path: normalizeRepoPath(itemPath),
+        };
+        for (const field of ["symbol", "summary", "locator"]) {
+            const valueForField = raw[field];
+            if (valueForField !== undefined) {
+                if (typeof valueForField !== "string") {
+                    throw new Error(`external_evidence item ${field} must be a string.`);
+                }
+                item[field] = valueForField;
+            }
+        }
+        if (raw.confidence !== undefined) {
+            if (typeof raw.confidence !== "number" || raw.confidence < 0 || raw.confidence > 1) {
+                throw new Error("external_evidence item confidence must be a number between 0 and 1.");
+            }
+            item.confidence = raw.confidence;
+        }
+        return item;
+    });
+}
+function requiredString(record, field) {
+    const value = record[field];
+    if (typeof value !== "string" || !value.trim()) {
+        throw new Error(`external_evidence item ${field} is required.`);
+    }
+    return value;
+}
+function isRecord(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function writeEvidence(repo, proposalId, status, worktree, proposalHash, appliedHash) {
     const dir = path.join(proposalRoot(repo), proposalId);
@@ -737,6 +822,23 @@ function knowledgeMarkdownFiles(repo) {
 }
 function listOrNone(items) {
     return items.length ? items.map((item) => `- ${item}`) : ["- none"];
+}
+function externalEvidenceLines(items) {
+    if (!items.length) {
+        return ["- none"];
+    }
+    return items.map((item) => {
+        const details = [`${item.source} (${item.source_type})`, item.path];
+        if (item.symbol)
+            details.push(`symbol: ${item.symbol}`);
+        if (item.summary)
+            details.push(item.summary);
+        if (item.locator)
+            details.push(`locator: ${item.locator}`);
+        if (item.confidence !== undefined)
+            details.push(`confidence: ${item.confidence}`);
+        return `- ${details.join(" | ")}`;
+    });
 }
 function truncate(value, budget) {
     if (value.length <= budget) {

@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { changedFiles, currentCommit, runGit, walkFiles, worktreeHash } from "./utils.js";
-import type { Candidate, PomInfo, ScanResult, SensitiveFinding } from "./types.js";
+import type { Candidate, ExternalEvidenceItem, PomInfo, ScanResult, SensitiveFinding } from "./types.js";
 
-export function scanRepo(repo: string, mode: "full" | "changed"): ScanResult {
+export function scanRepo(repo: string, mode: "full" | "changed", externalEvidence: ExternalEvidenceItem[] = []): ScanResult {
   const allFiles = walkFiles(repo);
   const scopedFiles = mode === "changed" ? changedFiles(repo) : allFiles;
   const entries: Record<string, Array<{ path: string; name: string }>> = {
@@ -46,7 +46,7 @@ export function scanRepo(repo: string, mode: "full" | "changed"): ScanResult {
     },
     candidates: detectCandidates(scopedFiles),
     sensitive_config_findings: sensitiveFindings(repo, scopedFiles.length ? scopedFiles : allFiles),
-    external_evidence: [],
+    external_evidence: externalEvidence,
   };
 }
 

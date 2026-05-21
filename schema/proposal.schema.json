@@ -15,6 +15,7 @@
     "created_at",
     "expires_at",
     "reason",
+    "external_evidence",
     "sensitive_scan_result",
     "proposal_status",
     "proposal_hash"
@@ -84,6 +85,12 @@
     "reason": {
       "type": "string",
       "minLength": 1
+    },
+    "external_evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "external-evidence.schema.json#/$defs/external_evidence_item"
+      }
     },
     "sensitive_scan_result": {
       "enum": ["passed", "blocked"]

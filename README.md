@@ -2,7 +2,7 @@
 
 `project-kb-core` is a Git-first project knowledge base governance CLI for AI coding agents and human reviewers.
 
-The CLI name is `project-kb`. It keeps long-lived project knowledge in `knowledge/`, keeps local proposal evidence in `.project-kb/proposals/`, and requires human TTY confirmation before writing generated knowledge files.
+The CLI name is `project-kb`. The local MCP server name is `project-kb-mcp`. The project keeps long-lived knowledge in `knowledge/`, keeps local proposal evidence in `.project-kb/proposals/`, and requires human TTY confirmation before writing generated knowledge files.
 
 ## What It Solves
 
@@ -19,16 +19,18 @@ npm install
 npm run build
 
 node dist/index.js init --repo /path/to/repo --template java-backend
-node dist/index.js scan --repo /path/to/repo --mode full
+node dist/index.js scan --repo /path/to/repo --mode full --external-evidence-file evidence.json
 node dist/index.js context --repo /path/to/repo --query "order payment" --budget 8000
 node dist/index.js context --repo /path/to/repo --source-file README.md --format json
 node dist/index.js stale --repo /path/to/repo
-node dist/index.js propose --repo /path/to/repo --updates-file updates.json --reason "update project knowledge" --inherit-source-metadata
+node dist/index.js propose --repo /path/to/repo --updates-file updates.json --external-evidence-file evidence.json --reason "update project knowledge" --inherit-source-metadata
 node dist/index.js review-summary --repo /path/to/repo
 node dist/index.js apply --repo /path/to/repo --proposal-id <id> --confirm
+node dist/mcp.js --help
 ```
 
 When installed as a package, use `project-kb` instead of `node dist/index.js`.
+Use `project-kb-mcp` to start the local stdio MCP server.
 
 ## Knowledge Layout
 
@@ -72,6 +74,36 @@ When updating an existing knowledge file, add `--inherit-source-metadata` to mer
 project-kb propose --repo /path/to/repo --updates-file updates.json --reason "refresh order knowledge" --inherit-source-metadata
 ```
 
+## External Evidence
+
+`project-kb scan` and `project-kb propose` can import optional external code evidence:
+
+```bash
+project-kb scan --repo /path/to/repo --external-evidence-file evidence.json
+project-kb propose --repo /path/to/repo --updates-file updates.json --external-evidence-file evidence.json --reason "refresh knowledge"
+```
+
+The file shape is:
+
+```json
+{
+  "schema_version": "1.0",
+  "external_evidence": [
+    {
+      "source": "aider-repo-map",
+      "source_type": "repo_map",
+      "path": "src/main/java/com/example/OrderService.java",
+      "symbol": "OrderService",
+      "summary": "Order service owns order planning rules.",
+      "locator": "src/main/java/com/example/OrderService.java#L12",
+      "confidence": 0.86
+    }
+  ]
+}
+```
+
+External tools are optional. Without this file, `external_evidence` is an empty array. When present, proposal evidence and `review-summary` cite the source.
+
 ## JSON Schemas
 
 The package ships JSON Schema draft 2020-12 files under `schema/`:
@@ -80,6 +112,7 @@ The package ships JSON Schema draft 2020-12 files under `schema/`:
 - `schema/proposal.schema.json`
 - `schema/trigger-result.schema.json`
 - `schema/context-pack.schema.json`
+- `schema/external-evidence.schema.json`
 
 The first public schema version is `1.0`. Patch releases may clarify descriptions without changing field meaning. Any incompatible field change must use a new schema version and a documented changelog entry.
 
@@ -98,6 +131,49 @@ project-kb propose --repo /tmp/project-kb-demo --updates-file updates.json --rea
 
 The proposal output must tell the user to run `project-kb apply` manually in a terminal.
 
+## MCP And Agent Adapters
+
+`project-kb-mcp` starts a local stdio MCP server. It exposes only:
+
+- `project_kb_scan`
+- `project_kb_context`
+- `project_kb_stale`
+- `project_kb_propose`
+- `project_kb_review_summary`
+
+It does not expose an apply tool. Generated proposals must still be reviewed, and a human must run terminal apply.
+
+Claude Code:
+
+```bash
+claude mcp add --transport stdio project-kb -- project-kb-mcp
+```
+
+Cursor project config:
+
+```json
+{
+  "mcpServers": {
+    "project-kb": {
+      "type": "stdio",
+      "command": "project-kb-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+Continue config:
+
+```yaml
+mcpServers:
+  - name: project-kb
+    command: project-kb-mcp
+    args: []
+```
+
+More details are in `adapters/claude-code/`, `adapters/cursor/`, and `adapters/continue/`.
+
 ## Release Check
 
 Before publishing, run:
@@ -110,6 +186,7 @@ node dist/index.js --help
 node dist/index.js init --help
 node dist/index.js context --help
 node dist/index.js propose --help
+node dist/mcp.js --help
 ```
 
 The package should include `README.md`, `LICENSE`, `CHANGELOG.md`, `dist/`, `adapters/`, `schema/`, `templates/`, and `package.json`.
@@ -118,7 +195,7 @@ The package should include `README.md`, `LICENSE`, `CHANGELOG.md`, `dist/`, `ada
 
 - Git repositories only.
 - No Web UI.
-- No MCP server.
+- Local stdio MCP server only. No remote HTTP MCP server.
 - No built-in semantic search or code graph.
 - No model-callable apply tool.
-- OpenCode support is an adapter example, not the core product.
+- OpenCode, Claude Code, Cursor, and Continue support are adapter examples, not the core product.

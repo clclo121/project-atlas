@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 
 const projectRoot = path.resolve(import.meta.dirname, "..");
@@ -149,11 +149,117 @@ function readSchema(name) {
   return JSON.parse(readFileSync(path.join(projectRoot, "schema", name), "utf8"));
 }
 
+function writeExternalEvidenceFile(repo) {
+  const evidenceFile = path.join(repo, "external-evidence.json");
+  writeFileSync(
+    evidenceFile,
+    JSON.stringify(
+      {
+        schema_version: "1.0",
+        external_evidence: [
+          {
+            source: "aider-repo-map",
+            source_type: "repo_map",
+            path: "src/main/java/com/example/service/PrecisionOrderService.java",
+            symbol: "PrecisionOrderService",
+            summary: "Precision order service handles order planning.",
+            locator: "src/main/java/com/example/service/PrecisionOrderService.java#L1",
+            confidence: 0.86,
+          },
+        ],
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+  return evidenceFile;
+}
+
 function assertRequiredFields(schema, fields) {
   for (const field of fields) {
     assert.ok(schema.required.includes(field), `${field} should be required`);
     assert.ok(schema.properties[field], `${field} should have a schema property`);
   }
+}
+
+function createMcpSession(cwd) {
+  const child = spawn(process.execPath, [path.join(projectRoot, "dist/mcp.js")], {
+    cwd,
+    stdio: ["pipe", "pipe", "pipe"],
+    env: { ...process.env, FORCE_COLOR: "0" },
+  });
+  child.stderr.setEncoding("utf8");
+  let stderr = "";
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk;
+  });
+  child.stdout.setEncoding("utf8");
+  let nextId = 1;
+  let buffer = "";
+  const waiters = new Map();
+  child.on("exit", (code, signal) => {
+    for (const [id, waiter] of waiters.entries()) {
+      waiter({
+        id,
+        error: {
+          message: `MCP server exited before response. code=${code} signal=${signal}\nstderr:\n${stderr}`,
+        },
+      });
+    }
+    waiters.clear();
+  });
+  child.stdout.on("data", (chunk) => {
+    buffer += chunk;
+    let newline = buffer.indexOf("\n");
+    while (newline >= 0) {
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      if (line) {
+        const message = JSON.parse(line);
+        if (message.id && waiters.has(message.id)) {
+          waiters.get(message.id)(message);
+          waiters.delete(message.id);
+        }
+      }
+      newline = buffer.indexOf("\n");
+    }
+  });
+  const request = (method, params = {}) => {
+    const id = nextId++;
+    const payload = { jsonrpc: "2.0", id, method, params };
+    return new Promise((resolve, reject) => {
+      if (child.exitCode !== null) {
+        reject(new Error(`MCP server already exited. code=${child.exitCode}\nstderr:\n${stderr}`));
+        return;
+      }
+      const timer = setTimeout(() => {
+        waiters.delete(id);
+        reject(new Error(`MCP request timed out: ${method}\nstderr:\n${stderr}`));
+      }, 5000);
+      waiters.set(id, (message) => {
+        clearTimeout(timer);
+        resolve(message);
+      });
+      child.stdin.write(`${JSON.stringify(payload)}\n`);
+    });
+  };
+  const notify = (method, params = {}) => {
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`);
+  };
+  const close = () =>
+    new Promise((resolve) => {
+      if (child.exitCode !== null || child.signalCode !== null) {
+        resolve(child.exitCode);
+        return;
+      }
+      child.once("exit", resolve);
+      child.stdin.end();
+      setTimeout(() => {
+        if (!child.killed) child.kill();
+      }, 1000).unref();
+    });
+  return { request, notify, close, child };
 }
 
 test("help output and parameter errors are short and actionable", () => {
@@ -328,6 +434,35 @@ test("scan reports project shape and redacts sensitive config values", () => {
     assert.equal(changed.status, 0, `scan changed should pass\nstdout:\n${changed.stdout}\nstderr:\n${changed.stderr}`);
     const changedJson = JSON.parse(changed.stdout);
     assert.ok(changedJson.changed_files.includes("src/main/java/com/example/service/StoreOwnedGoodsService.java"));
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("scan imports external evidence and rejects invalid evidence files", () => {
+  const repo = makeJavaRepo();
+  try {
+    initKnowledge(repo);
+    const evidenceFile = writeExternalEvidenceFile(repo);
+    const full = runProjectKb(["scan", "--repo", repo, "--mode", "full", "--external-evidence-file", evidenceFile], { cwd: repo });
+    assert.equal(full.status, 0, `scan with external evidence should pass\nstdout:\n${full.stdout}\nstderr:\n${full.stderr}`);
+    const payload = JSON.parse(full.stdout);
+    assert.equal(payload.external_evidence.length, 1);
+    assert.equal(payload.external_evidence[0].source, "aider-repo-map");
+    assert.equal(payload.external_evidence[0].source_type, "repo_map");
+    assert.equal(payload.external_evidence[0].path, "src/main/java/com/example/service/PrecisionOrderService.java");
+
+    const invalidJson = path.join(repo, "invalid-evidence.json");
+    writeFileSync(invalidJson, "{bad json", "utf8");
+    const invalidJsonResult = runProjectKb(["scan", "--repo", repo, "--external-evidence-file", invalidJson], { cwd: repo });
+    assert.notEqual(invalidJsonResult.status, 0, "invalid evidence JSON should fail");
+    assert.match(invalidJsonResult.stderr, /external evidence file must be valid JSON/);
+
+    const missingField = path.join(repo, "missing-field-evidence.json");
+    writeFileSync(missingField, JSON.stringify({ schema_version: "1.0", external_evidence: [{ source: "repo-map", source_type: "repo_map" }] }), "utf8");
+    const missingFieldResult = runProjectKb(["scan", "--repo", repo, "--external-evidence-file", missingField], { cwd: repo });
+    assert.notEqual(missingFieldResult.status, 0, "missing evidence fields should fail");
+    assert.match(missingFieldResult.stderr, /external_evidence item path is required/);
   } finally {
     cleanup(repo);
   }
@@ -570,6 +705,49 @@ test("propose creates multi-file evidence and blocks invalid or sensitive update
   }
 });
 
+test("propose stores external evidence from file and updates-file, and review-summary cites it", () => {
+  const repo = makeJavaRepo();
+  try {
+    initKnowledge(repo);
+    const evidenceFile = writeExternalEvidenceFile(repo);
+    const updatesFile = path.join(repo, "updates.json");
+    writeFileSync(
+      updatesFile,
+      JSON.stringify({
+        source_files: ["README.md"],
+        external_evidence: [
+          {
+            source: "codebase-memory",
+            source_type: "code_graph",
+            path: "src/main/java/com/example/controller/GoodsController.java",
+            summary: "Goods controller exposes goods entry points.",
+          },
+        ],
+        updates: [{ target: "knowledge/domains/order.md", content: "# 订单域\n\n记录订单规则。\n" }],
+      }),
+      "utf8",
+    );
+    const proposed = runProjectKb(["propose", "--repo", repo, "--updates-file", updatesFile, "--external-evidence-file", evidenceFile, "--reason", "外部证据测试"], {
+      cwd: repo,
+    });
+    assert.equal(proposed.status, 0, `propose with external evidence should pass\nstdout:\n${proposed.stdout}\nstderr:\n${proposed.stderr}`);
+    const latest = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals/latest.json"), "utf8"));
+    const proposal = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals", latest.proposal_id, "proposal.json"), "utf8"));
+    assert.equal(proposal.external_evidence.length, 2);
+    assert.ok(proposal.external_evidence.some((item) => item.source === "aider-repo-map"));
+    assert.ok(proposal.external_evidence.some((item) => item.source === "codebase-memory"));
+
+    const summary = runProjectKb(["review-summary", "--repo", repo], { cwd: repo });
+    assert.equal(summary.status, 0, `review summary should pass\nstdout:\n${summary.stdout}\nstderr:\n${summary.stderr}`);
+    assert.match(summary.stdout, /## External Evidence/);
+    assert.match(summary.stdout, /aider-repo-map/);
+    assert.match(summary.stdout, /codebase-memory/);
+    assert.match(summary.stdout, /PrecisionOrderService.java/);
+  } finally {
+    cleanup(repo);
+  }
+});
+
 test("propose can explicitly inherit existing source metadata", () => {
   const repo = makeRepo();
   try {
@@ -679,7 +857,7 @@ test("apply requires tty confirmation, blocks stale worktree, and records applie
 
 test("schema files are valid JSON and expose the versioned public shapes", () => {
   const schemaFiles = readdirSync(path.join(projectRoot, "schema")).filter((file) => file.endsWith(".schema.json")).sort();
-  assert.deepEqual(schemaFiles, ["context-pack.schema.json", "manifest.schema.json", "proposal.schema.json", "trigger-result.schema.json"]);
+  assert.deepEqual(schemaFiles, ["context-pack.schema.json", "external-evidence.schema.json", "manifest.schema.json", "proposal.schema.json", "trigger-result.schema.json"]);
   for (const file of schemaFiles) {
     const schema = readSchema(file);
     assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
@@ -687,6 +865,15 @@ test("schema files are valid JSON and expose the versioned public shapes", () =>
     assert.equal(schema.additionalProperties, false);
     assert.equal(schema.properties.schema_version.const, "1.0");
   }
+  const externalEvidenceSchema = readSchema("external-evidence.schema.json");
+  assertRequiredFields(externalEvidenceSchema, ["schema_version", "external_evidence"]);
+  const itemSchema = externalEvidenceSchema.properties.external_evidence.items;
+  for (const field of ["source", "source_type", "path"]) {
+    assert.ok(itemSchema.required.includes(field), `${field} should be required on external evidence items`);
+    assert.ok(itemSchema.properties[field], `${field} should have an item schema property`);
+  }
+  const proposalSchema = readSchema("proposal.schema.json");
+  assert.ok(proposalSchema.properties.external_evidence, "proposal schema should include external_evidence");
 });
 
 test("OpenCode adapter exposes only non-apply tools and proposes terminal apply", () => {
@@ -704,6 +891,79 @@ test("OpenCode adapter exposes only non-apply tools and proposes terminal apply"
   assert.match(proposeTool, /No apply tool is available/);
   assert.match(proposeTool, /human must run project-kb apply in a terminal/i);
   assert.doesNotMatch(`${scanTool}\n${contextTool}\n${proposeTool}`, /\["apply", "--repo"/);
+});
+
+test("ecosystem adapter docs expose only safe MCP or CLI entrypoints", () => {
+  const adapterDirs = ["claude-code", "cursor", "continue"];
+  for (const adapter of adapterDirs) {
+    const readmePath = path.join(projectRoot, "adapters", adapter, "README.md");
+    assert.ok(existsSync(readmePath), `${adapter} README should exist`);
+    const text = readFileSync(readmePath, "utf8");
+    assert.match(text, /project-kb-mcp|project-kb scan|project-kb context|project-kb propose/);
+    assert.doesNotMatch(text, /project_kb_apply/);
+    assert.doesNotMatch(text, /"apply"/);
+    assert.doesNotMatch(text, /\["apply"/);
+    assert.match(text, /apply .*terminal|terminal .*apply|人工.*终端/i);
+  }
+});
+
+test("MCP server exposes only safe tools and can call scan, context, and propose", async () => {
+  const repo = makeJavaRepo();
+  const session = createMcpSession(repo);
+  try {
+    initKnowledge(repo);
+    const initialized = await session.request("initialize", {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "project-kb-test", version: "1.0.0" },
+    });
+    assert.ok(initialized.result, `initialize should return a result: ${JSON.stringify(initialized)}`);
+    session.notify("notifications/initialized");
+
+    const listed = await session.request("tools/list");
+    const toolNames = listed.result.tools.map((tool) => tool.name).sort();
+    assert.deepEqual(toolNames, [
+      "project_kb_context",
+      "project_kb_propose",
+      "project_kb_review_summary",
+      "project_kb_scan",
+      "project_kb_stale",
+    ]);
+    assert.ok(!toolNames.some((name) => name.includes("apply")), "MCP server must not expose apply");
+
+    const scan = await session.request("tools/call", {
+      name: "project_kb_scan",
+      arguments: { repo, mode: "full" },
+    });
+    const scanText = scan.result.content[0].text;
+    assert.match(scanText, /"mode": "full"/);
+    assert.match(scanText, /demo-goods/);
+
+    const context = await session.request("tools/call", {
+      name: "project_kb_context",
+      arguments: { repo, query: "Demo", format: "json", budget: 800 },
+    });
+    assert.match(context.result.content[0].text, /schema_version/);
+
+    const updatesFile = path.join(repo, "mcp-updates.json");
+    writeFileSync(
+      updatesFile,
+      JSON.stringify({
+        source_files: ["README.md"],
+        updates: [{ target: "knowledge/domains/mcp.md", content: "# MCP 知识\n\n记录 MCP 调用。\n" }],
+      }),
+      "utf8",
+    );
+    const propose = await session.request("tools/call", {
+      name: "project_kb_propose",
+      arguments: { repo, updates_file: updatesFile, reason: "MCP proposal" },
+    });
+    assert.match(propose.result.content[0].text, /proposal_id:/);
+    assert.match(propose.result.content[0].text, /human must run project-kb apply in a terminal/i);
+  } finally {
+    await session.close();
+    cleanup(repo);
+  }
 });
 
 test("review-summary gives reviewer-friendly markdown evidence", () => {

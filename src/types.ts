@@ -26,7 +26,7 @@ export interface ScanResult {
     risks: Candidate[];
   };
   sensitive_config_findings: SensitiveFinding[];
-  external_evidence: unknown[];
+  external_evidence: ExternalEvidenceItem[];
 }
 
 export interface PomInfo {
@@ -49,6 +49,16 @@ export interface SensitiveFinding {
   action: string;
 }
 
+export interface ExternalEvidenceItem {
+  source: string;
+  source_type: string;
+  path: string;
+  symbol?: string;
+  summary?: string;
+  locator?: string;
+  confidence?: number;
+}
+
 export interface ProposalOperation {
   type: "replace_file";
   path: string;
@@ -67,6 +77,7 @@ export interface Proposal {
   created_at: string;
   expires_at: string;
   reason: string;
+  external_evidence: ExternalEvidenceItem[];
   sensitive_scan_result: "passed" | "blocked";
   proposal_status: ProposalStatus;
   proposal_hash: string;
