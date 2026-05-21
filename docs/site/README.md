@@ -19,6 +19,7 @@ node dist/index.js init --repo /tmp/project-kb-demo
 node dist/index.js context --repo /tmp/project-kb-demo --query demo
 node dist/index.js propose --repo /tmp/project-kb-demo --updates-file updates.json --reason "demo update"
 node dist/index.js review-summary --repo /tmp/project-kb-demo
+node dist/index.js check --repo /tmp/project-kb-demo
 ```
 
 真实写入仍然要由人回到终端执行：
@@ -28,3 +29,11 @@ node dist/index.js apply --repo /tmp/project-kb-demo --proposal-id <id> --confir
 ```
 
 Project KB 的核心边界是清楚的。Agent 可以读取上下文和生成 proposal，不能直接 apply。
+
+如果要沉淀项目级记忆，先准备结构化 JSON 候选文件，再生成 proposal：
+
+```bash
+node dist/index.js remember --repo /tmp/project-kb-demo --candidate-file memory.json --reason "capture project memory"
+```
+
+项目记忆仍然写入 `knowledge/`。它是团队共享知识，不读取个人聊天记录，也不绕过 review。

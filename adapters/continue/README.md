@@ -11,6 +11,6 @@ mcpServers:
     args: []
 ```
 
-After reloading Continue, choose the MCP context provider and call the safe project-kb tools for scan, context, stale checks, proposals, and review summary.
+After reloading Continue, choose the MCP context provider and call the safe project-kb tools for scan, context, stale checks, proposals, project memory proposals, health checks, and review summary.
 
 The adapter does not provide a direct write tool. A human must do terminal apply after proposal review.

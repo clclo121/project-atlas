@@ -2,9 +2,24 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import path from "node:path";
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { buildFrontmatter, ensureKnowledgeFrontmatter, parseFrontmatter } from "./frontmatter.js";
+import { buildFrontmatter, ensureKnowledgeFrontmatter, parseFrontmatter, type KnowledgeMetadata } from "./frontmatter.js";
 import { scanRepo } from "./scanner.js";
-import type { ContextItem, ExternalEvidenceItem, LatestIndex, OutputFormat, Proposal, ProposalOperation, ProposalStatus, StaleItem, TriggerResult } from "./types.js";
+import type {
+  CheckItem,
+  CheckResult,
+  ContextItem,
+  ExternalEvidenceItem,
+  LatestIndex,
+  MemoryCandidateInput,
+  MemoryCandidateItem,
+  MemoryType,
+  OutputFormat,
+  Proposal,
+  ProposalOperation,
+  ProposalStatus,
+  StaleItem,
+  TriggerResult,
+} from "./types.js";
 import {
   changedFiles,
   currentCommit,
@@ -40,9 +55,11 @@ interface UpdateInput {
 const commandOptions: Record<string, string[]> = {
   init: ["repo", "template"],
   scan: ["repo", "mode", "external-evidence-file"],
-  context: ["repo", "query", "source-file", "budget", "max-context-chars", "format"],
+  context: ["repo", "query", "source-file", "budget", "max-context-chars", "format", "memory-type", "topic", "scope"],
   stale: ["repo", "format"],
   propose: ["repo", "target", "content-file", "updates-file", "reason", "inherit-source-metadata", "external-evidence-file"],
+  remember: ["repo", "candidate-file", "reason", "format", "replace-existing"],
+  check: ["repo", "format"],
   apply: ["repo", "proposal-id", "confirm"],
   "review-summary": ["repo", "proposal-id"],
   cleanup: ["repo", "force"],
@@ -107,6 +124,8 @@ const globalHelp = [
   "  context          Print a compact context pack",
   "  stale            Check knowledge docs against source file hashes",
   "  propose          Create reviewable knowledge update evidence",
+  "  remember         Create reviewable project memory proposals",
+  "  check            Check project knowledge health",
   "  apply            Apply a proposal with TTY confirmation",
   "  review-summary   Print reviewer-friendly proposal evidence",
   "  cleanup          Remove stale temporary knowledge files",
@@ -115,7 +134,7 @@ const globalHelp = [
   "Examples:",
   "  project-kb init --repo /path/to/repo",
   "  project-kb context --repo /path/to/repo --query order --budget 8000",
-  "  project-kb propose --repo /path/to/repo --updates-file updates.json --reason \"update project knowledge\"",
+  "  project-kb remember --repo /path/to/repo --candidate-file memory.json --reason \"capture project memory\"",
   "",
   "Run `project-kb <command> --help` for command details.",
 ].join("\n");
@@ -143,12 +162,15 @@ const commandHelp: Record<string, string> = {
     "  project-kb scan --repo /path/to/repo --mode changed --external-evidence-file evidence.json",
   ].join("\n"),
   context: [
-    "Usage: project-kb context --repo <repo> [--query <text>] [--source-file <path>] [--budget <chars>] [--format <markdown|json>]",
+    "Usage: project-kb context --repo <repo> [--query <text>] [--source-file <path>] [--memory-type <decision|experience|project_fact>] [--topic <text>] [--scope <text>] [--budget <chars>] [--format <markdown|json>]",
     "",
     "Options:",
     "  --repo <path>       Git repository path. Defaults to current directory.",
     "  --query <text>      One or more keywords. Any keyword may match.",
     "  --source-file <path>  Return knowledge docs whose source_files include this path.",
+    "  --memory-type <value>  Filter project memory type.",
+    "  --topic <text>      Filter project memories by topic substring.",
+    "  --scope <text>      Filter project memories by scope substring.",
     "  --budget <chars>    Positive character budget. Defaults to 8000.",
     "  --format <value>    Output format. Use markdown or json. Defaults to markdown.",
     "",
@@ -180,6 +202,29 @@ const commandHelp: Record<string, string> = {
     "",
     "Example:",
     "  project-kb propose --repo /path/to/repo --updates-file updates.json --external-evidence-file evidence.json --reason \"update project knowledge\"",
+  ].join("\n"),
+  remember: [
+    "Usage: project-kb remember --repo <repo> --candidate-file <file> --reason <text> [--format <markdown|json>] [--replace-existing]",
+    "",
+    "Options:",
+    "  --repo <path>             Git repository path. Defaults to current directory.",
+    "  --candidate-file <file>   JSON memory candidate file.",
+    "  --reason <text>           Human-readable proposal reason.",
+    "  --format <value>          Output format. Use markdown or json. Defaults to markdown.",
+    "  --replace-existing        Allow proposal generation for existing target files.",
+    "",
+    "Example:",
+    "  project-kb remember --repo /path/to/repo --candidate-file memory.json --reason \"capture review memory\"",
+  ].join("\n"),
+  check: [
+    "Usage: project-kb check --repo <repo> [--format <markdown|json>]",
+    "",
+    "Options:",
+    "  --repo <path>       Git repository path. Defaults to current directory.",
+    "  --format <value>    Output format. Use markdown or json. Defaults to markdown.",
+    "",
+    "Example:",
+    "  project-kb check --repo /path/to/repo --format json",
   ].join("\n"),
   apply: [
     "Usage: project-kb apply --repo <repo> --proposal-id <id> --confirm",
@@ -258,6 +303,12 @@ export async function runCli(argv: string[]): Promise<void> {
       return;
     case "propose":
       cmdPropose(parsed.flags);
+      return;
+    case "remember":
+      cmdRemember(parsed.flags);
+      return;
+    case "check":
+      cmdCheck(parsed.flags);
       return;
     case "apply":
       await cmdApply(parsed.flags);
@@ -364,7 +415,10 @@ function cmdContext(flags: Record<string, string | boolean>): void {
   const format = formatFlag(flags, "context");
   const query = stringFlag(flags, "query", "");
   const sourceFile = optionalStringFlag(flags, "source-file");
-  const items = collectContextItems(repo, query, sourceFile);
+  const memoryType = optionalMemoryTypeFlag(flags, "context");
+  const topic = optionalStringFlag(flags, "topic");
+  const scope = optionalStringFlag(flags, "scope");
+  const items = collectContextItems(repo, { query, sourceFile, memoryType, topic, scope });
   const markdown = renderContextMarkdown(items);
   const truncated = truncate(markdown, budget);
   if (format === "json") {
@@ -416,6 +470,56 @@ function cmdPropose(flags: Record<string, string | boolean>): void {
   console.log(`proposal_status: ${proposal.proposal_status}`);
   console.log(`proposal_hash: ${proposal.proposal_hash}`);
   console.log(`apply: project-kb apply --repo ${repo} --proposal-id ${proposal.proposal_id} --confirm`);
+}
+
+function cmdRemember(flags: Record<string, string | boolean>): void {
+  const repo = resolveRepo(stringFlag(flags, "repo", "."));
+  ensureEvidenceIgnored(repo);
+  const candidateFile = optionalStringFlag(flags, "candidate-file");
+  if (!candidateFile) {
+    throw usageError("remember", "--candidate-file is required");
+  }
+  const reason = stringFlag(flags, "reason", "");
+  if (!reason) {
+    throw usageError("remember", "--reason is required");
+  }
+  const format = formatFlag(flags, "remember");
+  const replaceExisting = Boolean(flags["replace-existing"]);
+  const inputData = memoryCandidateToUpdateInput(repo, loadMemoryCandidate(repo, candidateFile), replaceExisting);
+  const proposal = createProposal(repo, inputData, reason, false);
+  const applyCommand = `project-kb apply --repo ${repo} --proposal-id ${proposal.proposal_id} --confirm`;
+  if (format === "json") {
+    console.log(
+      JSON.stringify(
+        {
+          schema_version: "1.0",
+          proposal_id: proposal.proposal_id,
+          proposal_status: proposal.proposal_status,
+          proposal_hash: proposal.proposal_hash,
+          target_files: proposal.target_files,
+          apply_command: applyCommand,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+  console.log(`proposal_id: ${proposal.proposal_id}`);
+  console.log(`proposal_status: ${proposal.proposal_status}`);
+  console.log(`proposal_hash: ${proposal.proposal_hash}`);
+  console.log(`apply: ${applyCommand}`);
+}
+
+function cmdCheck(flags: Record<string, string | boolean>): void {
+  const repo = resolveRepo(stringFlag(flags, "repo", "."));
+  const format = formatFlag(flags, "check");
+  const result = checkKnowledge(repo);
+  if (format === "json") {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  console.log(renderCheckMarkdown(result));
 }
 
 async function cmdApply(flags: Record<string, string | boolean>): Promise<void> {
@@ -473,10 +577,14 @@ function cmdReviewSummary(flags: Record<string, string | boolean>): void {
   const triggerPath = path.join(proposalDir, "trigger-result.json");
   const trigger = existsSync(triggerPath) ? readJson<TriggerResult>(triggerPath) : null;
   const stale = staleItems(repo);
+  const safetyStale = stale.filter((item) => !isScaffoldKnowledgeFile(item.path));
   const dryRunSummary = dryRunSummaryLines(path.join(proposalDir, "dry-run.diff"), proposal.target_files);
   const blocked = proposal.proposal_status === "blocked_sensitive" || proposal.sensitive_scan_result === "blocked";
-  const hasStale = stale.some((item) => item.status === "stale");
-  const canApply = proposal.proposal_status === "proposed" && !blocked;
+  const hasStale = safetyStale.some((item) => item.status === "stale");
+  const hasMissingSource = safetyStale.some((item) => item.status === "missing_source");
+  const hasMissingMetadata = safetyStale.some((item) => item.status === "missing_metadata");
+  const hasKnowledgeRisk = hasStale || hasMissingSource || hasMissingMetadata;
+  const canApply = proposal.proposal_status === "proposed" && !blocked && !hasKnowledgeRisk;
   const lines = [
     "# Project KB Review Summary",
     "",
@@ -506,17 +614,19 @@ function cmdReviewSummary(flags: Record<string, string | boolean>): void {
     ...stale.map((item) => `- ${item.path}: ${item.status}${item.status !== "fresh" ? `; ${item.suggestion}` : ""}`),
     "",
     "## Review Decision",
-    `- recommendation: ${reviewDecision(proposal, hasStale)}`,
+    `- recommendation: ${reviewDecision(proposal, { hasStale, hasMissingSource, hasMissingMetadata })}`,
     "",
     "## Apply Safety",
     `- can_apply: ${canApply ? "yes" : "no"}`,
     `- blocked_sensitive: ${blocked ? "yes" : "no"}`,
     `- stale_documents: ${hasStale ? "yes" : "no"}`,
+    `- missing_source_documents: ${hasMissingSource ? "yes" : "no"}`,
+    `- missing_metadata_documents: ${hasMissingMetadata ? "yes" : "no"}`,
     "",
     "## Next Step",
-    proposal.proposal_status === "proposed"
+    canApply
       ? `- Run: project-kb apply --repo ${repo} --proposal-id ${proposal.proposal_id} --confirm`
-      : `- No apply command is available for status ${proposal.proposal_status}.`,
+      : nextReviewStep(proposal, hasKnowledgeRisk),
     "",
   ];
   console.log(lines.join("\n"));
@@ -546,26 +656,47 @@ function cmdHash(flags: Record<string, string | boolean>): void {
   console.log(repoFileHash(repo, rel));
 }
 
-function collectContextItems(repo: string, query: string, sourceFile?: string): ContextItem[] {
-  const keywords = query
+function collectContextItems(
+  repo: string,
+  filters: { query: string; sourceFile?: string; memoryType?: MemoryType; topic?: string; scope?: string },
+): ContextItem[] {
+  const keywords = filters.query
     .toLowerCase()
     .split(/\s+/)
     .map((item) => item.trim())
     .filter(Boolean);
-  const groups: Array<{ priority: number; source_type: ContextItem["source_type"]; files: string[] }> = sourceFile
+  const hasMemoryFilters = Boolean(filters.memoryType || filters.topic || filters.scope);
+  const groups: Array<{ priority: number; source_type: ContextItem["source_type"]; files: string[] }> = filters.sourceFile || hasMemoryFilters
     ? [{ priority: 3, source_type: "knowledge", files: knowledgeMarkdownFiles(repo) }]
     : [
         { priority: 1, source_type: "openspec_change", files: globFiles(repo, "openspec/changes", [".md"]) },
         { priority: 2, source_type: "openspec_spec", files: globFiles(repo, "openspec/specs", [".md"]) },
         { priority: 3, source_type: "knowledge", files: knowledgeMarkdownFiles(repo) },
       ];
-  const normalizedSourceFile = sourceFile ? normalizeRepoPath(sourceFile) : "";
-  const sourceMatches = (content: string): boolean => {
+  const normalizedSourceFile = filters.sourceFile ? normalizeRepoPath(filters.sourceFile) : "";
+  const sourceMatches = (metadata: KnowledgeMetadata | null): boolean => {
     if (!normalizedSourceFile) {
       return true;
     }
-    const { metadata } = parseFrontmatter(content);
     return Boolean(metadata?.source_files.map(normalizeRepoPath).includes(normalizedSourceFile));
+  };
+  const metadataMatches = (metadata: KnowledgeMetadata | null): boolean => {
+    if (!hasMemoryFilters) {
+      return true;
+    }
+    if (!metadata) {
+      return false;
+    }
+    if (filters.memoryType && metadata.memory_type !== filters.memoryType) {
+      return false;
+    }
+    if (filters.topic && !includesIgnoreCase(metadata.topic, filters.topic)) {
+      return false;
+    }
+    if (filters.scope && !includesIgnoreCase(metadata.scope, filters.scope)) {
+      return false;
+    }
+    return true;
   };
   const queryMatches = (source: string, content: string): boolean => {
     if (!keywords.length) {
@@ -578,10 +709,11 @@ function collectContextItems(repo: string, query: string, sourceFile?: string): 
   for (const group of groups) {
     for (const source of group.files) {
       const content = readFileSync(path.join(repo, source), "utf8");
-      if (!sourceMatches(content) || !queryMatches(source, content)) {
+      const { metadata } = parseFrontmatter(content);
+      if (!sourceMatches(metadata) || !metadataMatches(metadata) || !queryMatches(source, content)) {
         continue;
       }
-      items.push({ source, source_type: group.source_type, priority: group.priority, content });
+      items.push({ source, source_type: group.source_type, priority: group.priority, content, metadata: contextMetadata(metadata) });
     }
   }
   return items.sort((a, b) => a.priority - b.priority || a.source.localeCompare(b.source));
@@ -590,9 +722,27 @@ function collectContextItems(repo: string, query: string, sourceFile?: string): 
 function renderContextMarkdown(items: ContextItem[]): string {
   const lines = ["# Project KB Context Pack", ""];
   for (const item of items) {
-    lines.push(`## Source: \`${item.source}\``, `Type: ${item.source_type}`, "", item.content.trim(), "");
+    lines.push(`## Source: \`${item.source}\``, `Type: ${item.source_type}`);
+    if (item.metadata?.memory_type) lines.push(`Memory Type: ${item.metadata.memory_type}`);
+    if (item.metadata?.topic) lines.push(`Topic: ${item.metadata.topic}`);
+    if (item.metadata?.scope) lines.push(`Scope: ${item.metadata.scope}`);
+    lines.push("", item.content.trim(), "");
   }
   return lines.join("\n");
+}
+
+function contextMetadata(metadata: KnowledgeMetadata | null): ContextItem["metadata"] | undefined {
+  if (!metadata) {
+    return undefined;
+  }
+  const result: ContextItem["metadata"] = {};
+  if (metadata.memory_type) result.memory_type = metadata.memory_type;
+  if (metadata.topic) result.topic = metadata.topic;
+  if (metadata.scope) result.scope = metadata.scope;
+  if (metadata.confidence !== undefined) result.confidence = metadata.confidence;
+  if (metadata.owner) result.owner = metadata.owner;
+  if (metadata.related_docs?.length) result.related_docs = metadata.related_docs;
+  return Object.keys(result).length ? result : undefined;
 }
 
 function staleItems(repo: string): StaleItem[] {
@@ -635,6 +785,115 @@ function renderStaleMarkdown(items: StaleItem[]): string {
   ].join("\n");
 }
 
+function checkKnowledge(repo: string): CheckResult {
+  const items: CheckItem[] = [];
+  const manifestPath = path.join(repo, "knowledge/manifest.json");
+  let requiredFiles: string[] = [];
+  if (!existsSync(manifestPath)) {
+    items.push(checkIssue("error", "missing_manifest", "knowledge/manifest.json", "knowledge manifest is missing.", "Run project-kb init or restore knowledge/manifest.json."));
+  } else {
+    try {
+      const manifest = readJson<{ required_files?: unknown }>(manifestPath);
+      if (Array.isArray(manifest.required_files)) {
+        requiredFiles = manifest.required_files.filter((item): item is string => typeof item === "string");
+      } else {
+        items.push(checkIssue("error", "invalid_manifest", "knowledge/manifest.json", "required_files must be an array.", "Repair knowledge/manifest.json."));
+      }
+    } catch {
+      items.push(checkIssue("error", "invalid_manifest", "knowledge/manifest.json", "manifest must be valid JSON.", "Repair knowledge/manifest.json."));
+    }
+  }
+  for (const rel of requiredFiles) {
+    if (!existsSync(path.join(repo, rel))) {
+      items.push(checkIssue("error", "missing_required_file", rel, "required knowledge file is missing.", "Restore the file or update required_files in knowledge/manifest.json."));
+    }
+  }
+
+  const topicPaths = new Map<string, string[]>();
+  for (const rel of knowledgeMarkdownFiles(repo)) {
+    const abs = path.join(repo, rel);
+    const content = readFileSync(abs, "utf8");
+    const { metadata, body } = parseFrontmatter(content);
+    if (!body.trim() && !isScaffoldKnowledgeFile(rel)) {
+      items.push(checkIssue("error", "empty_document", rel, "knowledge document has no body content.", "Add content or remove the empty document."));
+    }
+    for (const link of markdownRelativeLinks(content)) {
+      const target = path.normalize(path.join(path.dirname(abs), link));
+      if (!existsSync(target)) {
+        items.push(checkIssue("error", "broken_link", rel, `relative link is broken: ${link}`, "Fix the link target or remove the link."));
+      }
+    }
+    if (!metadata || metadata.source_files.length === 0) {
+      if (!isScaffoldKnowledgeFile(rel)) {
+        items.push(checkIssue("error", "missing_metadata", rel, "frontmatter or source_files missing.", "Regenerate this file with project-kb remember or project-kb propose."));
+      }
+      continue;
+    }
+    for (const source of metadata.source_files) {
+      const current = repoFileHash(repo, source);
+      const expected = metadata.source_hashes[source];
+      if (current === "sha256:missing") {
+        items.push(checkIssue("error", "missing_source", rel, `source file is missing: ${source}`, "Restore the source file or refresh this memory with current evidence."));
+      } else if (!expected || expected !== current) {
+        items.push(checkIssue("error", "stale_source", rel, `source hash changed: ${source}`, "Refresh this memory with project-kb remember or project-kb propose."));
+      }
+    }
+    if (metadata.topic) {
+      const key = metadata.topic.toLowerCase();
+      topicPaths.set(key, [...(topicPaths.get(key) ?? []), rel]);
+    }
+  }
+
+  for (const [topic, paths] of topicPaths.entries()) {
+    if (paths.length > 1) {
+      for (const rel of paths) {
+        items.push(checkIssue("warning", "duplicate_topic", rel, `topic appears in multiple files: ${topic}`, "Merge duplicated memories or use a more specific topic."));
+      }
+    }
+  }
+
+  for (const rel of globFiles(repo, "schema", [".schema.json"])) {
+    try {
+      JSON.parse(readFileSync(path.join(repo, rel), "utf8"));
+    } catch {
+      items.push(checkIssue("error", "invalid_schema_json", rel, "schema file must be valid JSON.", "Repair or remove the invalid schema file."));
+    }
+  }
+
+  const ok = !items.some((item) => item.level === "error");
+  return { schema_version: "1.0", repo, ok, items };
+}
+
+function renderCheckMarkdown(result: CheckResult): string {
+  const lines = ["# Project KB Check", "", `- ok: ${result.ok ? "yes" : "no"}`, `- issues: ${result.items.length}`, ""];
+  if (!result.items.length) {
+    lines.push("## Issues", "- none", "");
+    return lines.join("\n");
+  }
+  lines.push("## Issues");
+  for (const item of result.items) {
+    lines.push(`- ${item.level} ${item.rule_id} ${item.path}: ${item.message}; Suggestion: ${item.suggestion}`);
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+
+function checkIssue(level: CheckItem["level"], ruleId: string, pathValue: string, message: string, suggestion: string): CheckItem {
+  return { level, rule_id: ruleId, path: pathValue, message, suggestion };
+}
+
+function markdownRelativeLinks(content: string): string[] {
+  const links: string[] = [];
+  for (const match of content.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
+    const raw = match[1].trim();
+    if (!raw || raw.startsWith("#") || /^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith("/")) {
+      continue;
+    }
+    links.push(raw.split("#")[0]);
+  }
+  return links.filter(Boolean);
+}
+
 function createProposal(repo: string, inputData: UpdateInput, reason: string, inheritSourceMetadata = false): Proposal {
   const root = proposalRoot(repo);
   ensureDir(root);
@@ -673,6 +932,7 @@ function createProposal(repo: string, inputData: UpdateInput, reason: string, in
     base_commit: currentCommit(repo),
     worktree_diff_hash: worktreeHash(repo),
     source_files: sourceFiles,
+    source_hashes: sourceHashes,
     target_files: targetFiles,
     operations,
     created_at: new Date().toISOString(),
@@ -702,6 +962,104 @@ function loadUpdateInput(repo: string, target?: string, contentFile?: string, up
     throw new Error("provide --updates-file or --target with --content-file");
   }
   return { source_files: [], external_evidence: [], updates: [{ target, content: readFileSync(path.resolve(repo, contentFile), "utf8") }] };
+}
+
+function loadMemoryCandidate(repo: string, candidateFile: string): MemoryCandidateInput {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path.resolve(repo, candidateFile), "utf8"));
+  } catch {
+    throw new Error("memory candidate file must be valid JSON.");
+  }
+  if (!isRecord(parsed)) {
+    throw new Error("memory candidate file must contain a JSON object.");
+  }
+  if (parsed.schema_version !== "1.0") {
+    throw new Error("memory candidate schema_version must be 1.0.");
+  }
+  if (!Array.isArray(parsed.source_files) || parsed.source_files.length === 0) {
+    throw new Error("memory candidate source_files must be a non-empty array.");
+  }
+  const sourceFiles = parsed.source_files.map((source) => {
+    if (typeof source !== "string" || !source.trim()) {
+      throw new Error("memory candidate source_files items must be strings.");
+    }
+    return normalizeRepoPath(source);
+  });
+  if (!Array.isArray(parsed.memories) || parsed.memories.length === 0) {
+    throw new Error("memory candidate memories must be a non-empty array.");
+  }
+  return {
+    schema_version: "1.0",
+    source_files: sourceFiles,
+    memories: parsed.memories.map((raw) => validateMemoryCandidateItem(raw)),
+  };
+}
+
+function validateMemoryCandidateItem(raw: unknown): MemoryCandidateItem {
+  if (!isRecord(raw)) {
+    throw new Error("memory item must be an object.");
+  }
+  const target = validateKnowledgeTarget(requiredMemoryString(raw, "target"));
+  const memoryType = memoryTypeValue(requiredMemoryString(raw, "memory_type"), "memory item memory_type");
+  const topic = requiredMemoryString(raw, "topic");
+  const scope = requiredMemoryString(raw, "scope");
+  const summary = requiredMemoryString(raw, "summary");
+  const body = requiredMemoryString(raw, "body");
+  const confidence = raw.confidence;
+  if (typeof confidence !== "number" || confidence < 0 || confidence > 1) {
+    throw new Error("memory item confidence must be a number between 0 and 1.");
+  }
+  const item: MemoryCandidateItem = { target, memory_type: memoryType, topic, scope, confidence, summary, body };
+  if (raw.owner !== undefined) {
+    if (typeof raw.owner !== "string") {
+      throw new Error("memory item owner must be a string.");
+    }
+    item.owner = raw.owner;
+  }
+  if (raw.related_docs !== undefined) {
+    if (!Array.isArray(raw.related_docs)) {
+      throw new Error("memory item related_docs must be an array.");
+    }
+    item.related_docs = raw.related_docs.map((doc) => {
+      if (typeof doc !== "string" || !doc.trim()) {
+        throw new Error("memory item related_docs items must be strings.");
+      }
+      return normalizeRepoPath(doc);
+    });
+  }
+  return item;
+}
+
+function memoryCandidateToUpdateInput(repo: string, candidate: MemoryCandidateInput, replaceExisting: boolean): UpdateInput {
+  const sourceHashes = Object.fromEntries(candidate.source_files.map((source) => [source, repoFileHash(repo, source)]));
+  const updates = candidate.memories.map((memory) => {
+    if (!replaceExisting && existsSync(path.join(repo, memory.target))) {
+      throw new Error(`memory target already exists: ${memory.target}. Use --replace-existing to replace it.`);
+    }
+    return {
+      target: memory.target,
+      content: buildMemoryContent(memory, candidate.source_files, sourceHashes),
+    };
+  });
+  return { source_files: candidate.source_files, external_evidence: [], updates };
+}
+
+function buildMemoryContent(memory: MemoryCandidateItem, sourceFiles: string[], sourceHashes: Record<string, string>): string {
+  const body = memory.body.trim();
+  const content = body.startsWith("#") ? `${body}\n` : `# ${memory.summary}\n\n${body}\n`;
+  return `${buildFrontmatter({
+    source_files: sourceFiles,
+    source_hashes: sourceHashes,
+    generated_by: "project-kb",
+    review_status: "draft",
+    memory_type: memory.memory_type,
+    topic: memory.topic,
+    scope: memory.scope,
+    confidence: memory.confidence,
+    owner: memory.owner,
+    related_docs: memory.related_docs,
+  })}${content}`;
 }
 
 function loadExternalEvidence(repo: string, evidenceFile?: string): ExternalEvidenceItem[] {
@@ -763,7 +1121,15 @@ function requiredString(record: Record<string, unknown>, field: string): string 
   if (typeof value !== "string" || !value.trim()) {
     throw new Error(`external_evidence item ${field} is required.`);
   }
-  return value;
+  return value.trim();
+}
+
+function requiredMemoryString(record: Record<string, unknown>, field: string): string {
+  const value = record[field];
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`memory item ${field} is required.`);
+  }
+  return value.trim();
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -795,6 +1161,21 @@ function writeEvidence(repo: string, proposalId: string, status: ProposalStatus,
 }
 
 function assertProposalStillFresh(repo: string, proposal: Proposal): void {
+  const commit = currentCommit(repo);
+  if (commit && proposal.base_commit && commit !== proposal.base_commit) {
+    throw new Error(`base commit changed since proposal was created: ${proposal.base_commit} -> ${commit}`);
+  }
+  const sourceHashes = proposal.source_hashes ?? {};
+  for (const source of proposal.source_files) {
+    const expected = sourceHashes[source];
+    if (!expected) {
+      throw new Error(`proposal is missing source hash snapshot for ${source}; regenerate proposal.`);
+    }
+    const current = repoFileHash(repo, source);
+    if (current !== expected) {
+      throw new Error(`source changed since proposal was created: ${source}`);
+    }
+  }
   for (const operation of proposal.operations) {
     const current = repoFileHash(repo, operation.path);
     if (current !== operation.target_current_hash) {
@@ -834,17 +1215,36 @@ function dryRunSummaryLines(diffPath: string, targetFiles: string[]): string[] {
   return [`- target_files: ${targetFiles.length ? targetFiles.join(", ") : "none"}`, `- changed_lines: +${additions} -${deletions}`];
 }
 
-function reviewDecision(proposal: Proposal, hasStale: boolean): string {
+function reviewDecision(
+  proposal: Proposal,
+  risk: { hasStale: boolean; hasMissingSource: boolean; hasMissingMetadata: boolean },
+): string {
   if (proposal.proposal_status === "blocked_sensitive" || proposal.sensitive_scan_result === "blocked") {
     return "blocked by sensitive content; do not apply.";
   }
-  if (hasStale) {
+  if (risk.hasMissingSource) {
+    return "missing source files must be restored or reviewed before apply.";
+  }
+  if (risk.hasMissingMetadata) {
+    return "knowledge metadata is incomplete; regenerate or repair docs before apply.";
+  }
+  if (risk.hasStale) {
     return "review stale knowledge before apply.";
   }
   if (proposal.proposal_status === "proposed") {
     return "review dry-run.diff, then apply if content is correct.";
   }
   return `no apply action for status ${proposal.proposal_status}.`;
+}
+
+function nextReviewStep(proposal: Proposal, hasKnowledgeRisk: boolean): string {
+  if (proposal.proposal_status !== "proposed") {
+    return `- No apply command is available for status ${proposal.proposal_status}.`;
+  }
+  if (hasKnowledgeRisk) {
+    return "- Resolve stale, missing source, or missing metadata items, then regenerate the proposal.";
+  }
+  return "- No apply command is available until Apply Safety is clear.";
 }
 
 function staleSuggestion(pathValue: string, status: StaleItem["status"]): string {
@@ -858,6 +1258,15 @@ function staleSuggestion(pathValue: string, status: StaleItem["status"]): string
     return `Add project-kb frontmatter or regenerate with project-kb propose for ${pathValue}.`;
   }
   return `Run project-kb propose with refreshed content for ${pathValue}.`;
+}
+
+function isScaffoldKnowledgeFile(pathValue: string): boolean {
+  return (
+    pathValue === "knowledge/README.md" ||
+    pathValue === "knowledge/index.md" ||
+    pathValue === "knowledge/glossary.md" ||
+    /^knowledge\/(domains|workflows|contracts|integrations|quality|decisions)\/README\.md$/.test(pathValue)
+  );
 }
 
 function inheritedSourceFilesForTargets(repo: string, targetFiles: string[]): string[] {
@@ -1015,6 +1424,26 @@ function formatFlag(flags: Record<string, string | boolean>, command: string): O
     throw usageError(command, "--format must be markdown or json");
   }
   return format;
+}
+
+function optionalMemoryTypeFlag(flags: Record<string, string | boolean>, command: string): MemoryType | undefined {
+  const value = optionalStringFlag(flags, "memory-type");
+  return value ? memoryTypeValue(value, "--memory-type", command) : undefined;
+}
+
+function memoryTypeValue(value: string, label: string, command?: string): MemoryType {
+  if (value === "decision" || value === "experience" || value === "project_fact") {
+    return value;
+  }
+  const message = `${label} must be decision, experience, or project_fact`;
+  if (command) {
+    throw usageError(command, message);
+  }
+  throw new Error(message);
+}
+
+function includesIgnoreCase(value: string | undefined, query: string): boolean {
+  return Boolean(value?.toLowerCase().includes(query.toLowerCase()));
 }
 
 function usageError(command: string, message: string): Error {

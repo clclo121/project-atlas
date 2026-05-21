@@ -43,6 +43,35 @@
           },
           "content": {
             "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "memory_type": {
+                "enum": ["decision", "experience", "project_fact"]
+              },
+              "topic": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "owner": {
+                "type": "string"
+              },
+              "related_docs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
           }
         }
       }

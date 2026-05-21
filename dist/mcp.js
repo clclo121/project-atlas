@@ -12,6 +12,8 @@ const help = [
     "  project_kb_context",
     "  project_kb_stale",
     "  project_kb_propose",
+    "  project_kb_remember",
+    "  project_kb_check",
     "  project_kb_review_summary",
     "",
     "No apply tool is exposed. A human must run project-kb apply in a terminal.",
@@ -47,15 +49,21 @@ server.registerTool("project_kb_context", {
         repo: z.string().optional().describe("Git repository path. Defaults to the MCP server working directory."),
         query: z.string().optional().describe("One or more keywords. Any keyword may match."),
         source_file: z.string().optional().describe("Return knowledge docs whose source_files include this path."),
+        memory_type: z.enum(["decision", "experience", "project_fact"]).optional().describe("Filter project memory type."),
+        topic: z.string().optional().describe("Filter project memories by topic substring."),
+        scope: z.string().optional().describe("Filter project memories by scope substring."),
         budget: z.number().int().positive().optional().describe("Maximum context characters. Defaults to 8000."),
         format: z.enum(["markdown", "json"]).optional().describe("Output format. Defaults to markdown."),
     }),
-}, async ({ repo, query, source_file, budget, format }) => cliTool([
+}, async ({ repo, query, source_file, memory_type, topic, scope, budget, format }) => cliTool([
     "context",
     "--repo",
     repo || process.cwd(),
     ...flag("query", query),
     ...flag("source-file", source_file),
+    ...flag("memory-type", memory_type),
+    ...flag("topic", topic),
+    ...flag("scope", scope),
     ...flag("budget", budget),
     ...flag("format", format),
 ]));
@@ -93,6 +101,38 @@ server.registerTool("project_kb_propose", {
     ]);
     return appendText(output, "\nNo apply tool is available. A human must run project-kb apply in a terminal.");
 });
+server.registerTool("project_kb_remember", {
+    title: "Project KB Remember",
+    description: "Create reviewable project memory update evidence. This tool cannot apply the proposal.",
+    inputSchema: z.object({
+        repo: z.string().optional().describe("Git repository path. Defaults to the MCP server working directory."),
+        candidate_file: z.string().describe("JSON memory candidate file."),
+        reason: z.string().describe("Human-readable proposal reason."),
+        format: z.enum(["markdown", "json"]).optional().describe("Output format. Defaults to markdown."),
+        replace_existing: z.boolean().optional().describe("Allow proposal generation for existing target files."),
+    }),
+}, async ({ repo, candidate_file, reason, format, replace_existing }) => {
+    const output = await cliTool([
+        "remember",
+        "--repo",
+        repo || process.cwd(),
+        "--candidate-file",
+        candidate_file,
+        "--reason",
+        reason,
+        ...flag("format", format),
+        ...(replace_existing ? ["--replace-existing"] : []),
+    ]);
+    return appendText(output, "\nNo apply tool is available. A human must run project-kb apply in a terminal.");
+});
+server.registerTool("project_kb_check", {
+    title: "Project KB Check",
+    description: "Check project knowledge health. This tool never writes files.",
+    inputSchema: z.object({
+        repo: z.string().optional().describe("Git repository path. Defaults to the MCP server working directory."),
+        format: z.enum(["markdown", "json"]).optional().describe("Output format. Defaults to markdown."),
+    }),
+}, async ({ repo, format }) => cliTool(["check", "--repo", repo || process.cwd(), ...flag("format", format)]));
 server.registerTool("project_kb_review_summary", {
     title: "Project KB Review Summary",
     description: "Print reviewer-friendly proposal evidence. This tool never applies proposals.",

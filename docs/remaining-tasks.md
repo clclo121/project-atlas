@@ -291,6 +291,53 @@
 
 - 发布前可以按清单完成验证和打包。
 
+## 项目级记忆能力（已完成）
+
+完成状态：
+
+- 2026-05-21 已新增 `remember` 和 `check`。
+- 项目记忆仍然落在 `knowledge/`，并且只能通过 proposal 和人工终端 apply 进入仓库。
+- MCP 已新增 `project_kb_remember` 和 `project_kb_check`，仍然不暴露 apply。
+- 详细实现记录见 `docs/development-log/2026-05-21-memory-capability.md`。
+
+### 15. 记忆候选和 proposal
+
+当前状态：
+
+- `remember` 只接受结构化 JSON 候选文件。
+- 候选文件 schema 版本固定为 `1.0`。
+- 支持 `decision`、`experience` 和 `project_fact` 三种记忆类型。
+- 默认禁止覆盖已有目标文件，显式传 `--replace-existing` 才允许替换。
+
+完成内容：
+
+- 新增 `schema/memory-candidate.schema.json`。
+- 生成的知识文件写入 `memory_type`、`topic`、`scope`、`confidence`、`owner` 和 `related_docs` 等 frontmatter。
+- 继续写入 `source_files` 和 `source_hashes`，方便 stale 和 check 发现过期来源。
+
+验收标准：
+
+- agent 可以生成记忆 proposal。
+- 真实写入仍然只能由人执行终端 apply。
+
+### 16. 记忆读取和健康检查
+
+当前状态：
+
+- `context` 支持按 `--memory-type`、`--topic` 和 `--scope` 过滤项目记忆。
+- JSON 输出会给 items 增加 metadata，方便 agent 判断适用范围。
+- `check` 支持 Markdown 和 JSON 输出。
+
+完成内容：
+
+- 检查 manifest、required files、frontmatter、source hash、missing source、空文档、坏相对链接、重复 topic 和 schema JSON。
+- README 和文档站点补充项目记忆、个人记忆、代码图谱和外部证据的边界说明。
+
+验收标准：
+
+- 团队可以在发布前或交接前运行健康检查。
+- 记忆可以被模型按任务主题读取，但不能被模型绕过 review 写入。
+
 ## 暂不建议开发
 
 - Web UI。

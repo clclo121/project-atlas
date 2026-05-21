@@ -28,6 +28,7 @@ Java 后端、前端项目可以选择对应模板。
 - 需求开始前，agent 先读 `project-kb context`。
 - 需求结束后，只更新确实稳定的知识。
 - 所有知识更新先走 `project-kb propose`。
+- 项目记忆先走 `project-kb remember`，再由人 review。
 - reviewer 先读 `project-kb review-summary`。
 - 只有人能执行终端 apply。
 
@@ -41,6 +42,8 @@ Java 后端、前端项目可以选择对应模板。
 
 所有 adapter 都保持同一条安全边界。agent 可以生成 proposal，不能直接写入知识库。
 
+MCP 里的 `project_kb_remember` 和 `project_kb_check` 也是安全工具。前者只生成记忆 proposal，后者只做健康检查。
+
 ## 第五步 固定检查点
 
 建议在这些节点检查知识库：
@@ -49,5 +52,8 @@ Java 后端、前端项目可以选择对应模板。
 - 发布前。
 - 新同事接手项目。
 - 关键接口或流程调整后。
+- 决策、经验或项目事实被写入记忆前。
+
+建议把 `project-kb check --repo /path/to/repo --format json` 放进团队本地检查清单。它能在 review 前暴露缺来源、过期来源、坏链接和重复 topic。
 
 团队落地的目标不是文档越多越好，而是让可复用知识保持可信。

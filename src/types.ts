@@ -1,5 +1,6 @@
 export type ProposalStatus = "proposed" | "blocked_sensitive" | "applied";
 export type OutputFormat = "markdown" | "json";
+export type MemoryType = "decision" | "experience" | "project_fact";
 
 export interface ScanResult {
   schema_version: string;
@@ -72,6 +73,7 @@ export interface Proposal {
   base_commit: string;
   worktree_diff_hash: string;
   source_files: string[];
+  source_hashes: Record<string, string>;
   target_files: string[];
   operations: ProposalOperation[];
   created_at: string;
@@ -113,9 +115,50 @@ export interface StaleItem {
   suggestion: string;
 }
 
+export interface MemoryCandidateItem {
+  target: string;
+  memory_type: MemoryType;
+  topic: string;
+  scope: string;
+  confidence: number;
+  summary: string;
+  body: string;
+  owner?: string;
+  related_docs?: string[];
+}
+
+export interface MemoryCandidateInput {
+  schema_version: string;
+  source_files: string[];
+  memories: MemoryCandidateItem[];
+}
+
+export interface CheckItem {
+  level: "error" | "warning";
+  rule_id: string;
+  path: string;
+  message: string;
+  suggestion: string;
+}
+
+export interface CheckResult {
+  schema_version: string;
+  repo: string;
+  ok: boolean;
+  items: CheckItem[];
+}
+
 export interface ContextItem {
   source: string;
   source_type: "openspec_change" | "openspec_spec" | "knowledge";
   priority: number;
   content: string;
+  metadata?: {
+    memory_type?: MemoryType;
+    topic?: string;
+    scope?: string;
+    confidence?: number;
+    owner?: string;
+    related_docs?: string[];
+  };
 }

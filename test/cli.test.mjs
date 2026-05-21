@@ -176,6 +176,30 @@ function writeExternalEvidenceFile(repo) {
   return evidenceFile;
 }
 
+function writeMemoryCandidateFile(repo, override = {}) {
+  const candidateFile = path.join(repo, `memory-candidate-${Math.floor(Math.random() * 100000)}.json`);
+  const payload = {
+    schema_version: "1.0",
+    source_files: ["README.md"],
+    memories: [
+      {
+        target: "knowledge/decisions/source-review.md",
+        memory_type: "decision",
+        topic: "source review",
+        scope: "project",
+        confidence: 0.92,
+        summary: "Source review must be traceable.",
+        body: "Source review memories must keep source files and hashes before they enter shared knowledge.",
+        owner: "platform-team",
+        related_docs: ["knowledge/project/overview.md"],
+      },
+    ],
+    ...override,
+  };
+  writeFileSync(candidateFile, JSON.stringify(payload, null, 2), "utf8");
+  return candidateFile;
+}
+
 function assertRequiredFields(schema, fields) {
   for (const field of fields) {
     assert.ok(schema.required.includes(field), `${field} should be required`);
@@ -277,6 +301,9 @@ test("help output and parameter errors are short and actionable", () => {
   assert.match(contextHelp.stdout, /--source-file/);
   assert.match(contextHelp.stdout, /--budget/);
   assert.match(contextHelp.stdout, /--format/);
+  assert.match(contextHelp.stdout, /--memory-type/);
+  assert.match(contextHelp.stdout, /--topic/);
+  assert.match(contextHelp.stdout, /--scope/);
 
   const initHelp = runProjectKb(["init", "--help"], { cwd: projectRoot });
   assert.equal(initHelp.status, 0, `init help should pass\nstdout:\n${initHelp.stdout}\nstderr:\n${initHelp.stderr}`);
@@ -285,6 +312,15 @@ test("help output and parameter errors are short and actionable", () => {
   const proposeHelp = runProjectKb(["propose", "--help"], { cwd: projectRoot });
   assert.equal(proposeHelp.status, 0, `propose help should pass\nstdout:\n${proposeHelp.stdout}\nstderr:\n${proposeHelp.stderr}`);
   assert.match(proposeHelp.stdout, /--inherit-source-metadata/);
+
+  const rememberHelp = runProjectKb(["remember", "--help"], { cwd: projectRoot });
+  assert.equal(rememberHelp.status, 0, `remember help should pass\nstdout:\n${rememberHelp.stdout}\nstderr:\n${rememberHelp.stderr}`);
+  assert.match(rememberHelp.stdout, /--candidate-file/);
+  assert.match(rememberHelp.stdout, /--replace-existing/);
+
+  const checkHelp = runProjectKb(["check", "--help"], { cwd: projectRoot });
+  assert.equal(checkHelp.status, 0, `check help should pass\nstdout:\n${checkHelp.stdout}\nstderr:\n${checkHelp.stderr}`);
+  assert.match(checkHelp.stdout, /Usage: project-kb check/);
 
   const unknownCommand = runProjectKb(["unknown"], { cwd: projectRoot });
   assert.notEqual(unknownCommand.status, 0, "unknown command should fail");
@@ -312,6 +348,10 @@ test("help output and parameter errors are short and actionable", () => {
     const invalidBudget = runProjectKb(["context", "--repo", repo, "--budget", "abc"], { cwd: repo });
     assert.notEqual(invalidBudget.status, 0, "invalid budget should fail");
     assert.match(invalidBudget.stderr, /--budget must be a positive number/);
+
+    const invalidMemoryType = runProjectKb(["context", "--repo", repo, "--memory-type", "personal"], { cwd: repo });
+    assert.notEqual(invalidMemoryType.status, 0, "invalid memory type should fail");
+    assert.match(invalidMemoryType.stderr, /--memory-type must be decision, experience, or project_fact/);
   } finally {
     cleanup(repo);
   }
@@ -566,6 +606,83 @@ test("context supports multiple keywords, source lookup, source type, and trunca
   }
 });
 
+test("context can filter project memories by metadata", () => {
+  const repo = makeRepo();
+  try {
+    initKnowledge(repo);
+    const readmeHash = runProjectKb(["hash", "--repo", repo, "--path", "README.md"], { cwd: repo }).stdout.trim();
+    mkdirSync(path.join(repo, "knowledge/decisions"), { recursive: true });
+    mkdirSync(path.join(repo, "knowledge/domains"), { recursive: true });
+    mkdirSync(path.join(repo, "openspec/changes/demo"), { recursive: true });
+    writeFileSync(path.join(repo, "openspec/changes/demo/proposal.md"), "# Payment Change\n\npayment retry active context\n", "utf8");
+    writeFileSync(
+      path.join(repo, "knowledge/decisions/payment-memory.md"),
+      [
+        "---",
+        "kb_schema: 1",
+        "source_files:",
+        "  - README.md",
+        "source_hashes:",
+        `  README.md: ${readmeHash}`,
+        "generated_by: project-kb",
+        "review_status: draft",
+        "memory_type: decision",
+        "topic: payment retry",
+        "scope: backend",
+        "confidence: 0.88",
+        "owner: platform-team",
+        "related_docs:",
+        "  - knowledge/project/overview.md",
+        "---",
+        "# Payment Retry",
+        "",
+        "payment retry memory context",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    writeFileSync(
+      path.join(repo, "knowledge/domains/order-memory.md"),
+      [
+        "---",
+        "kb_schema: 1",
+        "source_files:",
+        "  - README.md",
+        "source_hashes:",
+        `  README.md: ${readmeHash}`,
+        "generated_by: project-kb",
+        "review_status: draft",
+        "memory_type: project_fact",
+        "topic: order",
+        "scope: backend",
+        "confidence: 0.8",
+        "---",
+        "# Order Memory",
+        "",
+        "order memory context",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = runProjectKb(
+      ["context", "--repo", repo, "--query", "payment", "--memory-type", "decision", "--topic", "retry", "--scope", "backend", "--format", "json"],
+      { cwd: repo },
+    );
+    assert.equal(result.status, 0, `context filter should pass\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+    const payload = JSON.parse(result.stdout);
+    assert.deepEqual(payload.items.map((item) => item.source), ["knowledge/decisions/payment-memory.md"]);
+    assert.equal(payload.items[0].metadata.memory_type, "decision");
+    assert.equal(payload.items[0].metadata.topic, "payment retry");
+    assert.equal(payload.items[0].metadata.scope, "backend");
+    assert.equal(payload.items[0].metadata.confidence, 0.88);
+    assert.deepEqual(payload.items[0].metadata.related_docs, ["knowledge/project/overview.md"]);
+    assert.doesNotMatch(payload.text, /payment retry active context/);
+  } finally {
+    cleanup(repo);
+  }
+});
+
 test("stale detects fresh, changed, missing, and metadata-less knowledge docs", () => {
   const repo = makeRepo();
   try {
@@ -802,6 +919,115 @@ test("propose can explicitly inherit existing source metadata", () => {
   }
 });
 
+test("remember creates reviewable memory proposals with metadata", () => {
+  const repo = makeRepo();
+  try {
+    initKnowledge(repo);
+    const candidateFile = writeMemoryCandidateFile(repo);
+    const remembered = runProjectKb(["remember", "--repo", repo, "--candidate-file", candidateFile, "--reason", "沉淀项目记忆", "--format", "json"], { cwd: repo });
+    assert.equal(remembered.status, 0, `remember should pass\nstdout:\n${remembered.stdout}\nstderr:\n${remembered.stderr}`);
+    const output = JSON.parse(remembered.stdout);
+    assert.equal(output.proposal_status, "proposed");
+    assert.match(output.apply_command, /project-kb apply/);
+    assert.deepEqual(output.target_files, ["knowledge/decisions/source-review.md"]);
+
+    const proposal = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals", output.proposal_id, "proposal.json"), "utf8"));
+    const content = proposal.operations[0].content;
+    assert.match(content, /memory_type: decision/);
+    assert.match(content, /topic: source review/);
+    assert.match(content, /scope: project/);
+    assert.match(content, /confidence: 0\.92/);
+    assert.match(content, /owner: platform-team/);
+    assert.match(content, /related_docs:\n  - knowledge\/project\/overview.md/);
+    assert.match(content, /# Source review must be traceable\./);
+    assert.match(content, /Source review memories must keep source files and hashes/);
+    assert.deepEqual(proposal.source_files, ["README.md"]);
+    assert.match(proposal.source_hashes["README.md"], /^sha256:/);
+
+    writeFileSync(path.join(repo, "knowledge/decisions/existing.md"), "# Existing\n", "utf8");
+    const existingCandidate = writeMemoryCandidateFile(repo, {
+      memories: [
+        {
+          target: "knowledge/decisions/existing.md",
+          memory_type: "experience",
+          topic: "existing memory",
+          scope: "project",
+          confidence: 0.6,
+          summary: "Existing memory replacement.",
+          body: "Existing memory replacement body.",
+        },
+      ],
+    });
+    const blocked = runProjectKb(["remember", "--repo", repo, "--candidate-file", existingCandidate, "--reason", "默认不覆盖"], { cwd: repo });
+    assert.notEqual(blocked.status, 0, "remember should reject existing targets by default");
+    assert.match(blocked.stderr, /already exists/);
+
+    const replaced = runProjectKb(["remember", "--repo", repo, "--candidate-file", existingCandidate, "--reason", "显式覆盖", "--replace-existing"], { cwd: repo });
+    assert.equal(replaced.status, 0, `remember replace should pass\nstdout:\n${replaced.stdout}\nstderr:\n${replaced.stderr}`);
+    assert.match(replaced.stdout, /proposal_id:/);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("remember validates memory candidate shape and target safety", () => {
+  const repo = makeRepo();
+  try {
+    initKnowledge(repo);
+    const invalidTarget = writeMemoryCandidateFile(repo, {
+      memories: [
+        {
+          target: "README.md",
+          memory_type: "decision",
+          topic: "bad target",
+          scope: "project",
+          confidence: 0.9,
+          summary: "Bad target.",
+          body: "Bad target body.",
+        },
+      ],
+    });
+    const badTargetResult = runProjectKb(["remember", "--repo", repo, "--candidate-file", invalidTarget, "--reason", "bad"], { cwd: repo });
+    assert.notEqual(badTargetResult.status, 0, "invalid target should fail");
+    assert.match(badTargetResult.stderr, /proposal target must be under knowledge/);
+
+    const invalidConfidence = writeMemoryCandidateFile(repo, {
+      memories: [
+        {
+          target: "knowledge/decisions/bad-confidence.md",
+          memory_type: "decision",
+          topic: "bad confidence",
+          scope: "project",
+          confidence: 1.2,
+          summary: "Bad confidence.",
+          body: "Bad confidence body.",
+        },
+      ],
+    });
+    const confidenceResult = runProjectKb(["remember", "--repo", repo, "--candidate-file", invalidConfidence, "--reason", "bad"], { cwd: repo });
+    assert.notEqual(confidenceResult.status, 0, "invalid confidence should fail");
+    assert.match(confidenceResult.stderr, /confidence must be a number between 0 and 1/);
+
+    const missingField = writeMemoryCandidateFile(repo, {
+      memories: [
+        {
+          target: "knowledge/decisions/missing.md",
+          memory_type: "decision",
+          scope: "project",
+          confidence: 0.8,
+          summary: "Missing topic.",
+          body: "Missing topic body.",
+        },
+      ],
+    });
+    const missingResult = runProjectKb(["remember", "--repo", repo, "--candidate-file", missingField, "--reason", "bad"], { cwd: repo });
+    assert.notEqual(missingResult.status, 0, "missing required field should fail");
+    assert.match(missingResult.stderr, /memory item topic is required/);
+  } finally {
+    cleanup(repo);
+  }
+});
+
 test("apply requires tty confirmation, blocks stale worktree, and records applied hash", () => {
   const repo = makeRepo();
   try {
@@ -855,9 +1081,49 @@ test("apply requires tty confirmation, blocks stale worktree, and records applie
   }
 });
 
+test("apply blocks proposals when source evidence changed after creation", () => {
+  const repo = makeRepo();
+  try {
+    initKnowledge(repo);
+    const updatesFile = path.join(repo, "updates.json");
+    writeFileSync(
+      updatesFile,
+      JSON.stringify({
+        source_files: ["README.md"],
+        updates: [{ target: "knowledge/domains/source-safety.md", content: "# 来源安全\n\n记录来源校验。\n" }],
+      }),
+      "utf8",
+    );
+    const proposed = runProjectKb(["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", "来源变更保护"], { cwd: repo });
+    assert.equal(proposed.status, 0, `propose should pass\nstdout:\n${proposed.stdout}\nstderr:\n${proposed.stderr}`);
+    const latest = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals/latest.json"), "utf8"));
+
+    writeFileSync(path.join(repo, "README.md"), "# Demo\n\nProject introduction changed after proposal.\n", "utf8");
+    run("git", ["add", "README.md"], { cwd: repo });
+    run("git", ["commit", "-m", "change source evidence"], { cwd: repo });
+
+    const applied = runProjectKbWithTty(["apply", "--repo", repo, "--proposal-id", latest.proposal_id, "--confirm"], {
+      cwd: repo,
+      input: "yes\n",
+    });
+    assert.notEqual(applied.status, 0, "apply should fail when source evidence changed after propose");
+    assert.match(applied.stdout + applied.stderr, /source|base commit/i);
+    assert.ok(!existsSync(path.join(repo, "knowledge/domains/source-safety.md")));
+  } finally {
+    cleanup(repo);
+  }
+});
+
 test("schema files are valid JSON and expose the versioned public shapes", () => {
   const schemaFiles = readdirSync(path.join(projectRoot, "schema")).filter((file) => file.endsWith(".schema.json")).sort();
-  assert.deepEqual(schemaFiles, ["context-pack.schema.json", "external-evidence.schema.json", "manifest.schema.json", "proposal.schema.json", "trigger-result.schema.json"]);
+  assert.deepEqual(schemaFiles, [
+    "context-pack.schema.json",
+    "external-evidence.schema.json",
+    "manifest.schema.json",
+    "memory-candidate.schema.json",
+    "proposal.schema.json",
+    "trigger-result.schema.json",
+  ]);
   for (const file of schemaFiles) {
     const schema = readSchema(file);
     assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
@@ -874,6 +1140,14 @@ test("schema files are valid JSON and expose the versioned public shapes", () =>
   }
   const proposalSchema = readSchema("proposal.schema.json");
   assert.ok(proposalSchema.properties.external_evidence, "proposal schema should include external_evidence");
+  assert.ok(proposalSchema.required.includes("source_hashes"), "proposal schema should require source hash snapshots");
+
+  const memoryCandidateSchema = readSchema("memory-candidate.schema.json");
+  assertRequiredFields(memoryCandidateSchema, ["schema_version", "source_files", "memories"]);
+  const memoryItemSchema = memoryCandidateSchema.properties.memories.items;
+  for (const field of ["target", "memory_type", "topic", "scope", "confidence", "summary", "body"]) {
+    assert.ok(memoryItemSchema.required.includes(field), `${field} should be required on memory items`);
+  }
 });
 
 test("OpenCode adapter exposes only non-apply tools and proposes terminal apply", () => {
@@ -907,7 +1181,7 @@ test("ecosystem adapter docs expose only safe MCP or CLI entrypoints", () => {
   }
 });
 
-test("MCP server exposes only safe tools and can call scan, context, and propose", async () => {
+test("MCP server exposes only safe tools and can call scan, context, check, propose, and remember", async () => {
   const repo = makeJavaRepo();
   const session = createMcpSession(repo);
   try {
@@ -923,8 +1197,10 @@ test("MCP server exposes only safe tools and can call scan, context, and propose
     const listed = await session.request("tools/list");
     const toolNames = listed.result.tools.map((tool) => tool.name).sort();
     assert.deepEqual(toolNames, [
+      "project_kb_check",
       "project_kb_context",
       "project_kb_propose",
+      "project_kb_remember",
       "project_kb_review_summary",
       "project_kb_scan",
       "project_kb_stale",
@@ -945,6 +1221,12 @@ test("MCP server exposes only safe tools and can call scan, context, and propose
     });
     assert.match(context.result.content[0].text, /schema_version/);
 
+    const check = await session.request("tools/call", {
+      name: "project_kb_check",
+      arguments: { repo, format: "json" },
+    });
+    assert.match(check.result.content[0].text, /"ok": true/);
+
     const updatesFile = path.join(repo, "mcp-updates.json");
     writeFileSync(
       updatesFile,
@@ -960,6 +1242,26 @@ test("MCP server exposes only safe tools and can call scan, context, and propose
     });
     assert.match(propose.result.content[0].text, /proposal_id:/);
     assert.match(propose.result.content[0].text, /human must run project-kb apply in a terminal/i);
+
+    const memoryCandidate = writeMemoryCandidateFile(repo, {
+      memories: [
+        {
+          target: "knowledge/decisions/mcp-memory.md",
+          memory_type: "experience",
+          topic: "mcp memory",
+          scope: "project",
+          confidence: 0.7,
+          summary: "MCP memory proposal.",
+          body: "MCP remember only creates proposals.",
+        },
+      ],
+    });
+    const remember = await session.request("tools/call", {
+      name: "project_kb_remember",
+      arguments: { repo, candidate_file: memoryCandidate, reason: "MCP memory proposal" },
+    });
+    assert.match(remember.result.content[0].text, /proposal_id:/);
+    assert.match(remember.result.content[0].text, /human must run project-kb apply in a terminal/i);
   } finally {
     await session.close();
     cleanup(repo);
@@ -969,7 +1271,7 @@ test("MCP server exposes only safe tools and can call scan, context, and propose
 test("P3 governance assets define docs site, CI matrix, and release scripts", () => {
   const packageJson = JSON.parse(readFileSync(path.join(projectRoot, "package.json"), "utf8"));
   assert.equal(packageJson.engines.node, ">=22");
-  assert.equal(packageJson.scripts.verify, "npm run lint:types && npm run build && npm test");
+  assert.equal(packageJson.scripts.verify, "npm run lint:types && npm test");
   assert.equal(packageJson.scripts["pack:dry-run"], "npm pack --dry-run");
 
   const siteFiles = [
@@ -988,6 +1290,7 @@ test("P3 governance assets define docs site, CI matrix, and release scripts", ()
 
   const readme = readFileSync(path.join(projectRoot, "README.md"), "utf8");
   assert.match(readme, /docs\/site\/README\.md/);
+  assert.ok(packageJson.files.includes("docs/site"), "npm package should include docs/site because README links to it");
 
   const ciPath = path.join(projectRoot, ".github/workflows/ci.yml");
   assert.ok(existsSync(ciPath), "CI workflow should exist");
@@ -1005,6 +1308,85 @@ test("P3 governance assets define docs site, CI matrix, and release scripts", ()
   assert.match(ci, /npm run build/);
   assert.match(ci, /npm test/);
   assert.match(ci, /npm pack --dry-run/);
+});
+
+test("check reports project knowledge health issues in markdown and json", () => {
+  const repo = makeRepo();
+  try {
+    initKnowledge(repo);
+    const healthy = runProjectKb(["check", "--repo", repo, "--format", "json"], { cwd: repo });
+    assert.equal(healthy.status, 0, `healthy check should pass\nstdout:\n${healthy.stdout}\nstderr:\n${healthy.stderr}`);
+    const healthyPayload = JSON.parse(healthy.stdout);
+    assert.equal(healthyPayload.ok, true);
+    assert.equal(healthyPayload.items.filter((item) => item.level === "error").length, 0);
+
+    const readmeHash = runProjectKb(["hash", "--repo", repo, "--path", "README.md"], { cwd: repo }).stdout.trim();
+    mkdirSync(path.join(repo, "knowledge/domains"), { recursive: true });
+    writeFileSync(path.join(repo, "knowledge/domains/no-metadata.md"), "# No Metadata\n\nMissing metadata.\n", "utf8");
+    writeFileSync(
+      path.join(repo, "knowledge/domains/stale.md"),
+      [
+        "---",
+        "kb_schema: 1",
+        "source_files:",
+        "  - README.md",
+        "source_hashes:",
+        `  README.md: ${readmeHash}`,
+        "generated_by: project-kb",
+        "review_status: draft",
+        "memory_type: project_fact",
+        "topic: duplicate topic",
+        "scope: project",
+        "confidence: 0.7",
+        "---",
+        "# Stale",
+        "",
+        "[Broken](missing.md)",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    writeFileSync(
+      path.join(repo, "knowledge/domains/missing-source.md"),
+      [
+        "---",
+        "kb_schema: 1",
+        "source_files:",
+        "  - docs/missing.md",
+        "source_hashes:",
+        "  docs/missing.md: sha256:missing",
+        "generated_by: project-kb",
+        "review_status: draft",
+        "memory_type: project_fact",
+        "topic: duplicate topic",
+        "scope: project",
+        "confidence: 0.7",
+        "---",
+        "# Missing Source",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    writeFileSync(path.join(repo, "README.md"), "# Demo Changed\n\nProject introduction changed.\n", "utf8");
+
+    const json = runProjectKb(["check", "--repo", repo, "--format", "json"], { cwd: repo });
+    assert.equal(json.status, 0, `check json should pass\nstdout:\n${json.stdout}\nstderr:\n${json.stderr}`);
+    const payload = JSON.parse(json.stdout);
+    assert.equal(payload.ok, false);
+    const rules = payload.items.map((item) => item.rule_id);
+    for (const rule of ["missing_metadata", "stale_source", "missing_source", "broken_link", "duplicate_topic"]) {
+      assert.ok(rules.includes(rule), `${rule} should be reported`);
+    }
+
+    const markdown = runProjectKb(["check", "--repo", repo], { cwd: repo });
+    assert.equal(markdown.status, 0, `check markdown should pass\nstdout:\n${markdown.stdout}\nstderr:\n${markdown.stderr}`);
+    assert.match(markdown.stdout, /# Project KB Check/);
+    assert.match(markdown.stdout, /ok: no/);
+    assert.match(markdown.stdout, /missing_metadata/);
+    assert.match(markdown.stdout, /duplicate_topic/);
+  } finally {
+    cleanup(repo);
+  }
 });
 
 test("review-summary gives reviewer-friendly markdown evidence", () => {
@@ -1034,6 +1416,33 @@ test("review-summary gives reviewer-friendly markdown evidence", () => {
     assert.match(summary.stdout, /## Apply Safety/);
     assert.match(summary.stdout, /can_apply: yes/);
     assert.match(summary.stdout, /project-kb apply/);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("review-summary blocks apply when knowledge metadata is missing", () => {
+  const repo = makeRepo();
+  try {
+    initKnowledge(repo);
+    mkdirSync(path.join(repo, "knowledge/domains"), { recursive: true });
+    writeFileSync(path.join(repo, "knowledge/domains/manual.md"), "# Manual Knowledge\n\nMissing source metadata.\n", "utf8");
+    const updatesFile = path.join(repo, "updates.json");
+    writeFileSync(
+      updatesFile,
+      JSON.stringify({
+        source_files: ["README.md"],
+        updates: [{ target: "knowledge/domains/order.md", content: "# 订单域\n\n记录订单规则。\n" }],
+      }),
+      "utf8",
+    );
+    const proposed = runProjectKb(["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", "missing metadata safety"], { cwd: repo });
+    assert.equal(proposed.status, 0, `propose should pass\nstdout:\n${proposed.stdout}\nstderr:\n${proposed.stderr}`);
+    const summary = runProjectKb(["review-summary", "--repo", repo], { cwd: repo });
+    assert.equal(summary.status, 0, `review summary should pass\nstdout:\n${summary.stdout}\nstderr:\n${summary.stderr}`);
+    assert.match(summary.stdout, /knowledge\/domains\/manual.md: missing_metadata/);
+    assert.match(summary.stdout, /can_apply: no/);
+    assert.match(summary.stdout, /missing_metadata_documents: yes/);
   } finally {
     cleanup(repo);
   }

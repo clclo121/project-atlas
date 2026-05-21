@@ -31,6 +31,8 @@ npm test
 npm pack --dry-run
 npm run verify
 node dist/index.js --help
+node dist/index.js remember --help
+node dist/index.js check --help
 node dist/mcp.js --help
 ```
 
@@ -43,13 +45,14 @@ node dist/mcp.js --help
 - `adapters/`
 - `schema/`
 - `templates/`
+- `docs/site/`
 - `package.json`
 
 不应包含：
 
 - `test/`
 - `src/`
-- `docs/`
+- `docs/development-log/`
 - `node_modules/`
 
 ## 发布步骤

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Fixed proposal freshness checks so `apply` blocks when the base commit or source file hashes changed after proposal creation.
+- Added proposal-level `source_hashes` snapshots to the public proposal schema.
+- Fixed `review-summary` apply safety so missing source and missing metadata in non-scaffold knowledge documents block apply.
+- Included `docs/site` in the npm package because README links to the documentation site.
+- Simplified `npm run verify` to avoid running the build step twice.
+- Added project memory proposal generation through `project-kb remember`.
+- Added `project-kb check` for knowledge health checks.
+- Added context filters and JSON metadata for project memory documents.
+- Added MCP tools for remember and check without changing the terminal apply boundary.
+- Added `schema/memory-candidate.schema.json`.
+
 ## 0.1.0
 
 - Added the first `project-kb` CLI with `init`, `scan`, `context`, `stale`, `propose`, `apply`, `review-summary`, `cleanup`, and `hash`.

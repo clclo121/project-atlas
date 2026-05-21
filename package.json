@@ -24,6 +24,7 @@
     "adapters",
     "schema",
     "templates",
+    "docs/site",
     "CHANGELOG.md",
     "LICENSE",
     "README.md"
@@ -32,7 +33,7 @@
     "build": "tsc -p tsconfig.json",
     "lint:types": "tsc --noEmit -p tsconfig.json",
     "test": "npm run build && node --test test/*.test.mjs",
-    "verify": "npm run lint:types && npm run build && npm test",
+    "verify": "npm run lint:types && npm test",
     "pack:dry-run": "npm pack --dry-run"
   },
   "engines": {

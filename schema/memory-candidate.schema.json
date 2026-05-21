@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/liuliuyun/project-kb-core/schema/memory-candidate.schema.json",
+  "title": "project-kb memory candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source_files", "memories"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "source_files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "memories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["target", "memory_type", "topic", "scope", "confidence", "summary", "body"],
+        "properties": {
+          "target": {
+            "type": "string",
+            "pattern": "^knowledge/"
+          },
+          "memory_type": {
+            "enum": ["decision", "experience", "project_fact"]
+          },
+          "topic": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1
+          },
+          "owner": {
+            "type": "string"
+          },
+          "related_docs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

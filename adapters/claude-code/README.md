@@ -22,6 +22,6 @@ For a team-shared project config, create `.mcp.json`:
 }
 ```
 
-Available tools are scan, context, stale, propose, and review summary.
+Available tools are scan, context, stale, propose, remember, check, and review summary.
 
 No model-callable write tool is provided. A human must do terminal apply after reviewing proposal evidence.

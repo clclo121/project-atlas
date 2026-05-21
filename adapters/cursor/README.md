@@ -22,6 +22,8 @@ Use the MCP tool list in Cursor to confirm these tools are available:
 - `project_kb_context`
 - `project_kb_stale`
 - `project_kb_propose`
+- `project_kb_remember`
+- `project_kb_check`
 - `project_kb_review_summary`
 
 The adapter only exposes read and proposal evidence actions. A human must do terminal apply after checking the review summary.
