@@ -12,6 +12,10 @@ The CLI name is `project-kb`. The local MCP server name is `project-kb-mcp`. The
 - Blocks direct model writes by keeping `apply` as an interactive terminal-only command.
 - Helps human reviewers inspect changes through `review-summary`.
 
+## Documentation
+
+Start from [docs/site/README.md](docs/site/README.md). It includes quick start, best practices, team rollout, security FAQ, and release process notes.
+
 ## Commands
 
 ```bash
@@ -182,12 +186,15 @@ Before publishing, run:
 npm run lint:types
 npm test
 npm pack --dry-run
+npm run verify
 node dist/index.js --help
 node dist/index.js init --help
 node dist/index.js context --help
 node dist/index.js propose --help
 node dist/mcp.js --help
 ```
+
+`npm run verify` runs type check, build, and tests. `npm run pack:dry-run` is a shorter alias for package content checks.
 
 The package should include `README.md`, `LICENSE`, `CHANGELOG.md`, `dist/`, `adapters/`, `schema/`, `templates/`, and `package.json`.
 

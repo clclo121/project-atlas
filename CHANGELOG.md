@@ -10,3 +10,5 @@
 - Added context source lookup, multi-keyword query, stale suggestions, review summary safety sections, and init templates.
 - Added optional external evidence import for scan and proposal review.
 - Added local stdio MCP server and Claude Code, Cursor, and Continue adapter docs without model-callable apply.
+- Added Markdown documentation site, GitHub Actions CI, and release governance notes.
+- Updated the supported Node.js engine to `>=22`.

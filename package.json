@@ -31,10 +31,12 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint:types": "tsc --noEmit -p tsconfig.json",
-    "test": "npm run build && node --test test/*.test.mjs"
+    "test": "npm run build && node --test test/*.test.mjs",
+    "verify": "npm run lint:types && npm run build && npm test",
+    "pack:dry-run": "npm pack --dry-run"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

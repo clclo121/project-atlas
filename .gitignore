@@ -6,4 +6,3 @@ node_modules/
 .project-kb/
 *.log
 .DS_Store
-/docs/development-log/

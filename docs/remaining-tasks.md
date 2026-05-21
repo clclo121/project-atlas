@@ -233,20 +233,26 @@
 - 没有外部工具时仍可正常使用。
 - 有外部证据时，proposal 和 review summary 能引用来源。
 
-## P3 产品体验和治理
+## P3 产品体验和治理（已完成）
+
+完成状态：
+
+- 2026-05-21 已补齐轻量 Markdown 文档站点、GitHub Actions CI 和发布治理说明。
+- 详细实现记录见 `docs/development-log/2026-05-21-p3-governance.md`。
 
 ### 12. 文档站点
 
 当前状态：
 
-- 只有 README 和 docs Markdown。
+- 已提供 `docs/site/` 轻量 Markdown 文档入口。
 
-待开发：
+完成内容：
 
 - 增加快速开始。
 - 增加最佳实践。
 - 增加团队落地流程。
 - 增加安全 FAQ。
+- 增加发布流程说明。
 
 验收标准：
 
@@ -257,11 +263,11 @@
 当前状态：
 
 - 本地命令已通过。
-- 还没有 GitHub Actions。
+- 已新增 GitHub Actions。
 
-待开发：
+完成内容：
 
-- 增加 Node 18、20、22 测试矩阵。
+- 增加 Node 22、24、26 测试矩阵。
 - 增加 `npm run lint:types`、`npm run build`、`npm test`。
 - 增加 `npm pack --dry-run`。
 
@@ -273,9 +279,9 @@
 
 当前状态：
 
-- 还没有版本发布约定。
+- 已在 `docs/site/release-process.md` 记录版本发布约定。
 
-待开发：
+完成内容：
 
 - 约定 SemVer。
 - 约定 changelog 格式。

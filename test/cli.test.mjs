@@ -966,6 +966,47 @@ test("MCP server exposes only safe tools and can call scan, context, and propose
   }
 });
 
+test("P3 governance assets define docs site, CI matrix, and release scripts", () => {
+  const packageJson = JSON.parse(readFileSync(path.join(projectRoot, "package.json"), "utf8"));
+  assert.equal(packageJson.engines.node, ">=22");
+  assert.equal(packageJson.scripts.verify, "npm run lint:types && npm run build && npm test");
+  assert.equal(packageJson.scripts["pack:dry-run"], "npm pack --dry-run");
+
+  const siteFiles = [
+    "README.md",
+    "quick-start.md",
+    "best-practices.md",
+    "team-rollout.md",
+    "security-faq.md",
+    "release-process.md",
+  ];
+  for (const file of siteFiles) {
+    const filePath = path.join(projectRoot, "docs/site", file);
+    assert.ok(existsSync(filePath), `docs/site/${file} should exist`);
+    assert.match(readFileSync(filePath, "utf8"), /project-kb|Project KB|发布|安全|团队|快速开始/i);
+  }
+
+  const readme = readFileSync(path.join(projectRoot, "README.md"), "utf8");
+  assert.match(readme, /docs\/site\/README\.md/);
+
+  const ciPath = path.join(projectRoot, ".github/workflows/ci.yml");
+  assert.ok(existsSync(ciPath), "CI workflow should exist");
+  const ci = readFileSync(ciPath, "utf8");
+  assert.match(ci, /push:/);
+  assert.match(ci, /pull_request:/);
+  assert.match(ci, /workflow_dispatch:/);
+  assert.match(ci, /node:\s*\[22,\s*24,\s*26\]/);
+  assert.doesNotMatch(ci, /node:\s*\[[^\]]*\b18\b/);
+  assert.doesNotMatch(ci, /node:\s*\[[^\]]*\b20\b/);
+  assert.match(ci, /actions\/checkout@v6/);
+  assert.match(ci, /actions\/setup-node@v6/);
+  assert.match(ci, /npm ci/);
+  assert.match(ci, /npm run lint:types/);
+  assert.match(ci, /npm run build/);
+  assert.match(ci, /npm test/);
+  assert.match(ci, /npm pack --dry-run/);
+});
+
 test("review-summary gives reviewer-friendly markdown evidence", () => {
   const repo = makeRepo();
   try {
