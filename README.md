@@ -18,11 +18,12 @@ The CLI name is `project-kb`. It keeps long-lived project knowledge in `knowledg
 npm install
 npm run build
 
-node dist/index.js init --repo /path/to/repo
+node dist/index.js init --repo /path/to/repo --template java-backend
 node dist/index.js scan --repo /path/to/repo --mode full
-node dist/index.js context --repo /path/to/repo --query order --budget 8000
+node dist/index.js context --repo /path/to/repo --query "order payment" --budget 8000
+node dist/index.js context --repo /path/to/repo --source-file README.md --format json
 node dist/index.js stale --repo /path/to/repo
-node dist/index.js propose --repo /path/to/repo --updates-file updates.json --reason "update project knowledge"
+node dist/index.js propose --repo /path/to/repo --updates-file updates.json --reason "update project knowledge" --inherit-source-metadata
 node dist/index.js review-summary --repo /path/to/repo
 node dist/index.js apply --repo /path/to/repo --proposal-id <id> --confirm
 ```
@@ -42,6 +43,34 @@ When installed as a package, use `project-kb` instead of `node dist/index.js`.
 - `knowledge/decisions/`
 
 Generated knowledge documents use YAML frontmatter with `source_files`, `source_hashes`, `generated_by`, and `review_status`.
+
+`project-kb init` supports lightweight wording templates:
+
+- `generic-service`
+- `java-backend`
+- `frontend-app`
+
+Templates keep the same `knowledge/` layout. They only change initial prompts and section descriptions. Existing files are not overwritten.
+
+## Context And Review
+
+`project-kb context` supports multiple query keywords. Any keyword may match, and sources are still ordered by active OpenSpec changes, archived OpenSpec specs, then `knowledge/`.
+
+Use `--source-file <path>` to find knowledge documents whose frontmatter references a source file:
+
+```bash
+project-kb context --repo /path/to/repo --source-file README.md --format json
+```
+
+JSON context packs include `source_type`, `truncated`, and `budget_used`, so agents can tell where content came from and whether the pack was shortened.
+
+`project-kb stale` prints suggested next actions for stale, missing source, and missing metadata cases. `project-kb review-summary` includes dry-run size, review decision, and apply safety sections.
+
+When updating an existing knowledge file, add `--inherit-source-metadata` to merge the old document's `source_files` into the new proposal:
+
+```bash
+project-kb propose --repo /path/to/repo --updates-file updates.json --reason "refresh order knowledge" --inherit-source-metadata
+```
 
 ## JSON Schemas
 
@@ -78,10 +107,12 @@ npm run lint:types
 npm test
 npm pack --dry-run
 node dist/index.js --help
+node dist/index.js init --help
 node dist/index.js context --help
+node dist/index.js propose --help
 ```
 
-The package should include `README.md`, `LICENSE`, `CHANGELOG.md`, `dist/`, `adapters/`, `schema/`, and `package.json`.
+The package should include `README.md`, `LICENSE`, `CHANGELOG.md`, `dist/`, `adapters/`, `schema/`, `templates/`, and `package.json`.
 
 ## First Version Boundaries
 

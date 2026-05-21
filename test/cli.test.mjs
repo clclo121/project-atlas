@@ -168,8 +168,17 @@ test("help output and parameter errors are short and actionable", () => {
   assert.match(contextHelp.stdout, /Usage: project-kb context/);
   assert.match(contextHelp.stdout, /--repo/);
   assert.match(contextHelp.stdout, /--query/);
+  assert.match(contextHelp.stdout, /--source-file/);
   assert.match(contextHelp.stdout, /--budget/);
   assert.match(contextHelp.stdout, /--format/);
+
+  const initHelp = runProjectKb(["init", "--help"], { cwd: projectRoot });
+  assert.equal(initHelp.status, 0, `init help should pass\nstdout:\n${initHelp.stdout}\nstderr:\n${initHelp.stderr}`);
+  assert.match(initHelp.stdout, /--template/);
+
+  const proposeHelp = runProjectKb(["propose", "--help"], { cwd: projectRoot });
+  assert.equal(proposeHelp.status, 0, `propose help should pass\nstdout:\n${proposeHelp.stdout}\nstderr:\n${proposeHelp.stderr}`);
+  assert.match(proposeHelp.stdout, /--inherit-source-metadata/);
 
   const unknownCommand = runProjectKb(["unknown"], { cwd: projectRoot });
   assert.notEqual(unknownCommand.status, 0, "unknown command should fail");
@@ -240,6 +249,61 @@ test("init requires a git repository and creates the knowledge skeleton", () => 
   }
 });
 
+test("init supports templates without overwriting existing knowledge files", () => {
+  const generic = makeRepo();
+  try {
+    initKnowledge(generic);
+    const overview = readFileSync(path.join(generic, "knowledge/project/overview.md"), "utf8");
+    assert.match(overview, /generic service/i);
+  } finally {
+    cleanup(generic);
+  }
+
+  const javaRepo = makeRepo();
+  try {
+    const initialized = runProjectKb(["init", "--repo", javaRepo, "--template", "java-backend"], { cwd: javaRepo });
+    assert.equal(initialized.status, 0, `java template init should pass\nstdout:\n${initialized.stdout}\nstderr:\n${initialized.stderr}`);
+    const overview = readFileSync(path.join(javaRepo, "knowledge/project/overview.md"), "utf8");
+    const domains = readFileSync(path.join(javaRepo, "knowledge/domains/README.md"), "utf8");
+    assert.match(overview, /Java backend/i);
+    assert.match(domains, /controller/i);
+  } finally {
+    cleanup(javaRepo);
+  }
+
+  const frontendRepo = makeRepo();
+  try {
+    const initialized = runProjectKb(["init", "--repo", frontendRepo, "--template", "frontend-app"], { cwd: frontendRepo });
+    assert.equal(initialized.status, 0, `frontend template init should pass\nstdout:\n${initialized.stdout}\nstderr:\n${initialized.stderr}`);
+    const overview = readFileSync(path.join(frontendRepo, "knowledge/project/overview.md"), "utf8");
+    const workflows = readFileSync(path.join(frontendRepo, "knowledge/workflows/README.md"), "utf8");
+    assert.match(overview, /frontend app/i);
+    assert.match(workflows, /routing/i);
+  } finally {
+    cleanup(frontendRepo);
+  }
+
+  const invalid = makeRepo();
+  try {
+    const result = runProjectKb(["init", "--repo", invalid, "--template", "unknown"], { cwd: invalid });
+    assert.notEqual(result.status, 0, "unknown template should fail");
+    assert.match(result.stderr, /--template must be generic-service, java-backend, or frontend-app/);
+  } finally {
+    cleanup(invalid);
+  }
+
+  const noOverwrite = makeRepo();
+  try {
+    mkdirSync(path.join(noOverwrite, "knowledge/project"), { recursive: true });
+    writeFileSync(path.join(noOverwrite, "knowledge/project/overview.md"), "# Custom Overview\n", "utf8");
+    const initialized = runProjectKb(["init", "--repo", noOverwrite, "--template", "java-backend"], { cwd: noOverwrite });
+    assert.equal(initialized.status, 0, `init should pass without overwriting\nstdout:\n${initialized.stdout}\nstderr:\n${initialized.stderr}`);
+    assert.equal(readFileSync(path.join(noOverwrite, "knowledge/project/overview.md"), "utf8"), "# Custom Overview\n");
+  } finally {
+    cleanup(noOverwrite);
+  }
+});
+
 test("scan reports project shape and redacts sensitive config values", () => {
   const repo = makeJavaRepo();
   try {
@@ -295,6 +359,78 @@ test("context outputs source paths, respects priority, and supports json format"
   }
 });
 
+test("context supports multiple keywords, source lookup, source type, and truncation metadata", () => {
+  const repo = makeRepo();
+  try {
+    initKnowledge(repo);
+    mkdirSync(path.join(repo, "openspec/changes/demo/specs/order"), { recursive: true });
+    mkdirSync(path.join(repo, "openspec/specs/payment"), { recursive: true });
+    mkdirSync(path.join(repo, "knowledge/domains"), { recursive: true });
+    writeFileSync(path.join(repo, "openspec/changes/demo/proposal.md"), "# Order Change\n\norder active context\n", "utf8");
+    writeFileSync(path.join(repo, "openspec/specs/payment/spec.md"), "# Payment Spec\n\npayment archived context\n", "utf8");
+    writeFileSync(path.join(repo, "other.md"), "# Other\n", "utf8");
+    writeFileSync(
+      path.join(repo, "knowledge/domains/from-readme.md"),
+      [
+        "---",
+        "kb_schema: 1",
+        "source_files:",
+        "  - README.md",
+        "source_hashes:",
+        "  README.md: sha256:missing",
+        "generated_by: project-kb",
+        "review_status: draft",
+        "---",
+        "# Readme Knowledge",
+        "",
+        "inventory notes from readme",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    writeFileSync(
+      path.join(repo, "knowledge/domains/from-other.md"),
+      [
+        "---",
+        "kb_schema: 1",
+        "source_files:",
+        "  - other.md",
+        "source_hashes:",
+        "  other.md: sha256:missing",
+        "generated_by: project-kb",
+        "review_status: draft",
+        "---",
+        "# Other Knowledge",
+        "",
+        "other source notes",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const multi = runProjectKb(["context", "--repo", repo, "--query", "order payment", "--format", "json", "--budget", "120"], { cwd: repo });
+    assert.equal(multi.status, 0, `multi keyword context should pass\nstdout:\n${multi.stdout}\nstderr:\n${multi.stderr}`);
+    const payload = JSON.parse(multi.stdout);
+    assert.equal(payload.truncated, true);
+    assert.ok(payload.budget_used <= 120, "budget_used should respect the budget");
+    assert.ok(payload.items.some((item) => item.source === "openspec/changes/demo/proposal.md" && item.source_type === "openspec_change"));
+    assert.ok(payload.items.some((item) => item.source === "openspec/specs/payment/spec.md" && item.source_type === "openspec_spec"));
+    assert.equal(payload.items[0].source_type, "openspec_change");
+
+    const sourceLookup = runProjectKb(["context", "--repo", repo, "--source-file", "README.md", "--format", "json"], { cwd: repo });
+    assert.equal(sourceLookup.status, 0, `source lookup should pass\nstdout:\n${sourceLookup.stdout}\nstderr:\n${sourceLookup.stderr}`);
+    const sourcePayload = JSON.parse(sourceLookup.stdout);
+    assert.deepEqual(
+      sourcePayload.items.map((item) => item.source),
+      ["knowledge/domains/from-readme.md", "knowledge/project/overview.md"],
+    );
+    assert.ok(sourcePayload.items.every((item) => item.source_type === "knowledge"));
+    assert.ok(!sourcePayload.items.some((item) => item.source === "knowledge/domains/from-other.md"));
+  } finally {
+    cleanup(repo);
+  }
+});
+
 test("stale detects fresh, changed, missing, and metadata-less knowledge docs", () => {
   const repo = makeRepo();
   try {
@@ -344,11 +480,17 @@ test("stale detects fresh, changed, missing, and metadata-less knowledge docs", 
     assert.equal(items.find((item) => item.path.endsWith("fresh.md")).status, "fresh");
     assert.equal(items.find((item) => item.path.endsWith("missing.md")).status, "missing_source");
     assert.equal(items.find((item) => item.path.endsWith("no-frontmatter.md")).status, "missing_metadata");
+    assert.match(items.find((item) => item.path.endsWith("missing.md")).suggestion, /Check missing source file/);
 
     writeFileSync(path.join(repo, "README.md"), "# Demo changed\n", "utf8");
     stale = runProjectKb(["stale", "--repo", repo, "--format", "json"], { cwd: repo });
     items = JSON.parse(stale.stdout).items;
     assert.equal(items.find((item) => item.path.endsWith("fresh.md")).status, "stale");
+    assert.match(items.find((item) => item.path.endsWith("fresh.md")).suggestion, /project-kb propose/);
+
+    const markdown = runProjectKb(["stale", "--repo", repo], { cwd: repo });
+    assert.equal(markdown.status, 0, `stale markdown should pass\nstdout:\n${markdown.stdout}\nstderr:\n${markdown.stderr}`);
+    assert.match(markdown.stdout, /Suggestion:/);
   } finally {
     cleanup(repo);
   }
@@ -423,6 +565,60 @@ test("propose creates multi-file evidence and blocks invalid or sensitive update
     assert.equal(blocked.proposal_status, "blocked_sensitive");
     const blockedText = readFileSync(path.join(repo, ".project-kb/proposals", blocked.proposal_id, "proposal.json"), "utf8");
     assert.doesNotMatch(blockedText, /secret-value-123456/);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("propose can explicitly inherit existing source metadata", () => {
+  const repo = makeRepo();
+  try {
+    initKnowledge(repo);
+    mkdirSync(path.join(repo, "docs"), { recursive: true });
+    mkdirSync(path.join(repo, "knowledge/domains"), { recursive: true });
+    writeFileSync(path.join(repo, "docs/new-source.md"), "# New Source\n", "utf8");
+    const readmeHash = runProjectKb(["hash", "--repo", repo, "--path", "README.md"], { cwd: repo }).stdout.trim();
+    writeFileSync(
+      path.join(repo, "knowledge/domains/order.md"),
+      [
+        "---",
+        "kb_schema: 1",
+        "source_files:",
+        "  - README.md",
+        "source_hashes:",
+        `  README.md: ${readmeHash}`,
+        "generated_by: project-kb",
+        "review_status: draft",
+        "---",
+        "# Existing Order",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const updatesFile = path.join(repo, "updates.json");
+    writeFileSync(
+      updatesFile,
+      JSON.stringify({
+        source_files: ["docs/new-source.md"],
+        updates: [{ target: "knowledge/domains/order.md", content: "# Updated Order\n\nnew content\n" }],
+      }),
+      "utf8",
+    );
+
+    const normal = runProjectKb(["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", "默认不继承"], { cwd: repo });
+    assert.equal(normal.status, 0, `normal propose should pass\nstdout:\n${normal.stdout}\nstderr:\n${normal.stderr}`);
+    let latest = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals/latest.json"), "utf8"));
+    let proposal = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals", latest.proposal_id, "proposal.json"), "utf8"));
+    assert.match(proposal.operations[0].content, /  - docs\/new-source.md/);
+    assert.doesNotMatch(proposal.operations[0].content, /  - README.md/);
+
+    const inherited = runProjectKb(["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", "显式继承", "--inherit-source-metadata"], { cwd: repo });
+    assert.equal(inherited.status, 0, `inherited propose should pass\nstdout:\n${inherited.stdout}\nstderr:\n${inherited.stderr}`);
+    latest = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals/latest.json"), "utf8"));
+    proposal = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals", latest.proposal_id, "proposal.json"), "utf8"));
+    assert.match(proposal.operations[0].content, /  - README.md/);
+    assert.match(proposal.operations[0].content, /  - docs\/new-source.md/);
+    assert.match(proposal.operations[0].content, new RegExp(`README\\.md: ${readmeHash.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
   } finally {
     cleanup(repo);
   }
@@ -532,6 +728,10 @@ test("review-summary gives reviewer-friendly markdown evidence", () => {
     assert.match(summary.stdout, /README.md/);
     assert.match(summary.stdout, /knowledge\/domains\/order.md/);
     assert.match(summary.stdout, /stale/i);
+    assert.match(summary.stdout, /## Dry Run Summary/);
+    assert.match(summary.stdout, /## Review Decision/);
+    assert.match(summary.stdout, /## Apply Safety/);
+    assert.match(summary.stdout, /can_apply: yes/);
     assert.match(summary.stdout, /project-kb apply/);
   } finally {
     cleanup(repo);

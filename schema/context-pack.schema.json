@@ -4,7 +4,7 @@
   "title": "project-kb context pack",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "budget", "text", "items"],
+  "required": ["schema_version", "budget", "budget_used", "truncated", "text", "items"],
   "properties": {
     "schema_version": {
       "const": "1.0"
@@ -12,6 +12,13 @@
     "budget": {
       "type": "integer",
       "minimum": 1
+    },
+    "budget_used": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "truncated": {
+      "type": "boolean"
     },
     "text": {
       "type": "string"
@@ -21,11 +28,14 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["source", "priority", "content"],
+        "required": ["source", "source_type", "priority", "content"],
         "properties": {
           "source": {
             "type": "string",
             "minLength": 1
+          },
+          "source_type": {
+            "enum": ["openspec_change", "openspec_spec", "knowledge"]
           },
           "priority": {
             "type": "integer",

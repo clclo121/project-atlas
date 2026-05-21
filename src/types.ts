@@ -99,10 +99,12 @@ export interface StaleItem {
   status: "fresh" | "stale" | "missing_source" | "missing_metadata";
   source_files: string[];
   details: string[];
+  suggestion: string;
 }
 
 export interface ContextItem {
   source: string;
+  source_type: "openspec_change" | "openspec_spec" | "knowledge";
   priority: number;
   content: string;
 }

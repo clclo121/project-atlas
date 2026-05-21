@@ -90,16 +90,22 @@
 - `npm pack --dry-run` 输出只包含预期文件。
 - README、LICENSE、dist、adapters、schema 被纳入包。
 
-## P1 提升真实项目可用性
+## P1 提升真实项目可用性（已完成）
+
+完成状态：
+
+- 2026-05-21 已补齐 context 多关键词和来源反查、stale 建议、review-summary 风险摘要、propose source metadata 显式继承和 init template。
+- 详细实现记录见 `docs/development-log/2026-05-21-p1-usability.md`。
 
 ### 5. context pack 质量增强
 
 当前状态：
 
 - `context` 已按来源优先级输出上下文。
-- 查询逻辑仍是简单关键词匹配。
+- 已支持多个 query 关键词，默认任一命中。
+- 已支持按 `source_files` 反查知识文档。
 
-待开发：
+完成内容：
 
 - 支持多个 query 关键词。
 - 支持按 `source_files` 反查知识文档。
@@ -116,9 +122,9 @@
 当前状态：
 
 - 已根据 source hash 判断 fresh、stale、missing source 和 missing metadata。
-- 还没有对 proposal 和 review summary 做联动建议。
+- 已对 stale、proposal 和 review summary 补联动建议。
 
-待开发：
+完成内容：
 
 - `stale` 输出建议命令。
 - `review-summary` 中高亮 stale 文档。
@@ -134,9 +140,9 @@
 当前状态：
 
 - 已输出 proposal、source、target、敏感扫描和 stale 状态。
-- 还没有输出 dry-run 摘要和风险分组。
+- 已输出 dry-run 摘要和风险分组。
 
-待开发：
+完成内容：
 
 - 摘要 dry-run.diff 的目标文件和变更规模。
 - 增加 `Review Decision` 区域。
@@ -151,9 +157,9 @@
 当前状态：
 
 - `init` 创建通用目录和 `project/overview.md`。
-- 模板内容较轻。
+- 已支持三种轻量模板。
 
-待开发：
+完成内容：
 
 - 增加 `templates/java-backend`。
 - 增加 `templates/generic-service`。

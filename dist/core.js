@@ -6,15 +6,53 @@ import { buildFrontmatter, ensureKnowledgeFrontmatter, parseFrontmatter } from "
 import { scanRepo } from "./scanner.js";
 import { currentCommit, ensureDir, ensureEvidenceIgnored, fileHash, proposalRoot, readJson, removeFileIfExists, replaceFileAtomic, repoFileHash, resolveRepo, sha256Text, updateGitignore, validateKnowledgeTarget, walkFiles, worktreeHash, writeIfMissing, writeJson, } from "./utils.js";
 const commandOptions = {
-    init: ["repo"],
+    init: ["repo", "template"],
     scan: ["repo", "mode"],
-    context: ["repo", "query", "budget", "max-context-chars", "format"],
+    context: ["repo", "query", "source-file", "budget", "max-context-chars", "format"],
     stale: ["repo", "format"],
-    propose: ["repo", "target", "content-file", "updates-file", "reason"],
+    propose: ["repo", "target", "content-file", "updates-file", "reason", "inherit-source-metadata"],
     apply: ["repo", "proposal-id", "confirm"],
     "review-summary": ["repo", "proposal-id"],
     cleanup: ["repo", "force"],
     hash: ["repo", "path"],
+};
+const initTemplates = {
+    "generic-service": {
+        displayName: "Generic Service",
+        overview: "Summarize this generic service, who uses it, and which runtime boundaries matter most.",
+        sections: {
+            domains: "Record stable business domains, ownership terms, and key user-facing concepts for this generic service.",
+            workflows: "Record important service workflows, trigger points, and handoff rules.",
+            contracts: "Record public APIs, event contracts, file contracts, and compatibility notes.",
+            integrations: "Record upstream and downstream systems, owners, and failure handling expectations.",
+            quality: "Record test strategy, release checks, risk hotspots, and operational guardrails.",
+            decisions: "Record durable technical and product decisions with source evidence.",
+        },
+    },
+    "java-backend": {
+        displayName: "Java Backend",
+        overview: "Summarize this Java backend service, its modules, runtime boundaries, and main controller to service responsibilities.",
+        sections: {
+            domains: "Record Java backend domain concepts, controller entry points, service ownership, and aggregate boundaries.",
+            workflows: "Record request flows, scheduled tasks, MQ consumers, transaction rules, and retry behavior.",
+            contracts: "Record REST APIs, Feign clients, DTO compatibility rules, and database contract notes.",
+            integrations: "Record middleware, downstream services, remote clients, and failure fallback rules.",
+            quality: "Record unit, integration, regression, and release checks for Java backend changes.",
+            decisions: "Record durable architecture decisions, dependency choices, and migration notes.",
+        },
+    },
+    "frontend-app": {
+        displayName: "Frontend App",
+        overview: "Summarize this frontend app, user groups, key pages, routing boundaries, and data ownership.",
+        sections: {
+            domains: "Record user-facing concepts, page ownership, state naming, and product language.",
+            workflows: "Record routing flows, form flows, async loading rules, and empty or error states.",
+            contracts: "Record API contracts, component props, event payloads, and compatibility notes.",
+            integrations: "Record backend APIs, auth dependencies, analytics, uploads, and third-party SDKs.",
+            quality: "Record visual checks, browser coverage, build checks, and accessibility expectations.",
+            decisions: "Record durable UI, state management, routing, and dependency decisions.",
+        },
+    },
 };
 const globalHelp = [
     "Usage: project-kb <command> [options]",
@@ -41,13 +79,14 @@ const globalHelp = [
 ].join("\n");
 const commandHelp = {
     init: [
-        "Usage: project-kb init --repo <repo>",
+        "Usage: project-kb init --repo <repo> [--template <generic-service|java-backend|frontend-app>]",
         "",
         "Options:",
         "  --repo <path>       Git repository path. Defaults to current directory.",
+        "  --template <name>   Initial knowledge wording template. Defaults to generic-service.",
         "",
         "Example:",
-        "  project-kb init --repo /path/to/repo",
+        "  project-kb init --repo /path/to/repo --template java-backend",
     ].join("\n"),
     scan: [
         "Usage: project-kb scan --repo <repo> --mode <full|changed>",
@@ -60,11 +99,12 @@ const commandHelp = {
         "  project-kb scan --repo /path/to/repo --mode changed",
     ].join("\n"),
     context: [
-        "Usage: project-kb context --repo <repo> [--query <text>] [--budget <chars>] [--format <markdown|json>]",
+        "Usage: project-kb context --repo <repo> [--query <text>] [--source-file <path>] [--budget <chars>] [--format <markdown|json>]",
         "",
         "Options:",
         "  --repo <path>       Git repository path. Defaults to current directory.",
-        "  --query <text>      Topic or keyword used to filter context files.",
+        "  --query <text>      One or more keywords. Any keyword may match.",
+        "  --source-file <path>  Return knowledge docs whose source_files include this path.",
         "  --budget <chars>    Positive character budget. Defaults to 8000.",
         "  --format <value>    Output format. Use markdown or json. Defaults to markdown.",
         "",
@@ -91,6 +131,7 @@ const commandHelp = {
         "  --target <path>        Single target under knowledge/**.",
         "  --content-file <file>  Markdown content for a single target.",
         "  --reason <text>        Human-readable proposal reason.",
+        "  --inherit-source-metadata  Merge existing target source_files into the proposal.",
         "",
         "Example:",
         "  project-kb propose --repo /path/to/repo --updates-file updates.json --reason \"update project knowledge\"",
@@ -190,6 +231,8 @@ export async function runCli(argv) {
 }
 function cmdInit(flags) {
     const repo = resolveRepo(stringFlag(flags, "repo", "."));
+    const templateName = templateFlag(flags);
+    const template = initTemplates[templateName];
     updateGitignore(repo);
     for (const dir of [
         "knowledge/project",
@@ -204,7 +247,7 @@ function cmdInit(flags) {
         ensureDir(path.join(repo, dir));
     }
     writeIfMissing(path.join(repo, ".project-kb/proposals/.keep"), "");
-    writeIfMissing(path.join(repo, "knowledge/README.md"), "# Project Knowledge Base\n\nGit-first knowledge assets for humans and AI coding agents.\n");
+    writeIfMissing(path.join(repo, "knowledge/README.md"), `# Project Knowledge Base\n\nGit-first knowledge assets for humans and AI coding agents.\n\nTemplate: ${template.displayName}\n`);
     writeIfMissing(path.join(repo, "knowledge/index.md"), [
         "# Knowledge Index",
         "",
@@ -219,9 +262,9 @@ function cmdInit(flags) {
     ].join("\n"));
     writeIfMissing(path.join(repo, "knowledge/glossary.md"), "# Glossary\n\nRecord stable domain terms here.\n");
     for (const dir of ["domains", "workflows", "contracts", "integrations", "quality", "decisions"]) {
-        writeIfMissing(path.join(repo, "knowledge", dir, "README.md"), `# ${dir}\n\nThis section is intentionally empty.\n`);
+        writeIfMissing(path.join(repo, "knowledge", dir, "README.md"), `# ${dir}\n\n${template.sections[dir]}\n`);
     }
-    writeIfMissing(path.join(repo, "knowledge/project/overview.md"), `${buildFrontmatter({ source_files: ["README.md"], source_hashes: { "README.md": repoFileHash(repo, "README.md") } })}# Project Overview\n\nSummarize what this project does, who uses it, and where the main boundaries are.\n`);
+    writeIfMissing(path.join(repo, "knowledge/project/overview.md"), `${buildFrontmatter({ source_files: ["README.md"], source_hashes: { "README.md": repoFileHash(repo, "README.md") } })}# Project Overview\n\n${template.overview}\n`);
     writeIfMissing(path.join(repo, "knowledge/manifest.json"), `${JSON.stringify({
         schema_version: "1.0",
         max_context_chars: 8000,
@@ -243,14 +286,22 @@ function cmdContext(flags) {
     const budget = typeof flags.budget === "string" ? numberFlag(flags, "budget", 8000, "context") : numberFlag(flags, "max-context-chars", 8000, "context");
     const format = formatFlag(flags, "context");
     const query = stringFlag(flags, "query", "");
-    const items = collectContextItems(repo, query);
+    const sourceFile = optionalStringFlag(flags, "source-file");
+    const items = collectContextItems(repo, query, sourceFile);
     const markdown = renderContextMarkdown(items);
-    const text = truncate(markdown, budget);
+    const truncated = truncate(markdown, budget);
     if (format === "json") {
-        console.log(JSON.stringify({ schema_version: "1.0", budget, text, items: items.map((item) => ({ ...item, content: truncate(item.content, budget) })) }, null, 2));
+        console.log(JSON.stringify({
+            schema_version: "1.0",
+            budget,
+            budget_used: truncated.budget_used,
+            truncated: truncated.truncated,
+            text: truncated.text,
+            items: items.map((item) => ({ ...item, content: truncate(item.content, budget).text })),
+        }, null, 2));
         return;
     }
-    console.log(text);
+    console.log(truncated.text);
 }
 function cmdStale(flags) {
     const repo = resolveRepo(stringFlag(flags, "repo", "."));
@@ -269,11 +320,12 @@ function cmdPropose(flags) {
     const contentFile = optionalStringFlag(flags, "content-file");
     const updatesFile = optionalStringFlag(flags, "updates-file");
     const reason = stringFlag(flags, "reason", "Knowledge update proposal");
+    const inheritSourceMetadata = Boolean(flags["inherit-source-metadata"]);
     if (target && updatesFile) {
         throw new Error("--target and --updates-file cannot be used together");
     }
     const inputData = loadUpdateInput(repo, target, contentFile, updatesFile);
-    const proposal = createProposal(repo, inputData, reason);
+    const proposal = createProposal(repo, inputData, reason, inheritSourceMetadata);
     console.log(`proposal_id: ${proposal.proposal_id}`);
     console.log(`proposal_status: ${proposal.proposal_status}`);
     console.log(`proposal_hash: ${proposal.proposal_hash}`);
@@ -333,6 +385,10 @@ function cmdReviewSummary(flags) {
     const triggerPath = path.join(proposalDir, "trigger-result.json");
     const trigger = existsSync(triggerPath) ? readJson(triggerPath) : null;
     const stale = staleItems(repo);
+    const dryRunSummary = dryRunSummaryLines(path.join(proposalDir, "dry-run.diff"), proposal.target_files);
+    const blocked = proposal.proposal_status === "blocked_sensitive" || proposal.sensitive_scan_result === "blocked";
+    const hasStale = stale.some((item) => item.status === "stale");
+    const canApply = proposal.proposal_status === "proposed" && !blocked;
     const lines = [
         "# Project KB Review Summary",
         "",
@@ -352,8 +408,19 @@ function cmdReviewSummary(flags) {
         "## Sensitive Scan",
         `- result: ${proposal.sensitive_scan_result}`,
         "",
+        "## Dry Run Summary",
+        ...dryRunSummary,
+        "",
         "## Stale Status",
-        ...stale.map((item) => `- ${item.path}: ${item.status}`),
+        ...stale.map((item) => `- ${item.path}: ${item.status}${item.status !== "fresh" ? `; ${item.suggestion}` : ""}`),
+        "",
+        "## Review Decision",
+        `- recommendation: ${reviewDecision(proposal, hasStale)}`,
+        "",
+        "## Apply Safety",
+        `- can_apply: ${canApply ? "yes" : "no"}`,
+        `- blocked_sensitive: ${blocked ? "yes" : "no"}`,
+        `- stale_documents: ${hasStale ? "yes" : "no"}`,
         "",
         "## Next Step",
         proposal.proposal_status === "proposed"
@@ -385,20 +452,42 @@ function cmdHash(flags) {
     }
     console.log(repoFileHash(repo, rel));
 }
-function collectContextItems(repo, query) {
-    const groups = [
-        { priority: 1, files: globFiles(repo, "openspec/changes", [".md"]) },
-        { priority: 2, files: globFiles(repo, "openspec/specs", [".md"]) },
-        { priority: 3, files: globFiles(repo, "knowledge", [".md"]).filter((rel) => !rel.startsWith("knowledge/logs/") && !rel.startsWith("knowledge/assets/")) },
-    ];
+function collectContextItems(repo, query, sourceFile) {
+    const keywords = query
+        .toLowerCase()
+        .split(/\s+/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+    const groups = sourceFile
+        ? [{ priority: 3, source_type: "knowledge", files: knowledgeMarkdownFiles(repo) }]
+        : [
+            { priority: 1, source_type: "openspec_change", files: globFiles(repo, "openspec/changes", [".md"]) },
+            { priority: 2, source_type: "openspec_spec", files: globFiles(repo, "openspec/specs", [".md"]) },
+            { priority: 3, source_type: "knowledge", files: knowledgeMarkdownFiles(repo) },
+        ];
+    const normalizedSourceFile = sourceFile ? normalizeRepoPath(sourceFile) : "";
+    const sourceMatches = (content) => {
+        if (!normalizedSourceFile) {
+            return true;
+        }
+        const { metadata } = parseFrontmatter(content);
+        return Boolean(metadata?.source_files.map(normalizeRepoPath).includes(normalizedSourceFile));
+    };
+    const queryMatches = (source, content) => {
+        if (!keywords.length) {
+            return true;
+        }
+        const haystack = `${source}\n${content}`.toLowerCase();
+        return keywords.some((keyword) => haystack.includes(keyword));
+    };
     const items = [];
     for (const group of groups) {
         for (const source of group.files) {
             const content = readFileSync(path.join(repo, source), "utf8");
-            if (query && !content.toLowerCase().includes(query.toLowerCase()) && !source.toLowerCase().includes(query.toLowerCase())) {
+            if (!sourceMatches(content) || !queryMatches(source, content)) {
                 continue;
             }
-            items.push({ source, priority: group.priority, content });
+            items.push({ source, source_type: group.source_type, priority: group.priority, content });
         }
     }
     return items.sort((a, b) => a.priority - b.priority || a.source.localeCompare(b.source));
@@ -406,18 +495,23 @@ function collectContextItems(repo, query) {
 function renderContextMarkdown(items) {
     const lines = ["# Project KB Context Pack", ""];
     for (const item of items) {
-        lines.push(`## Source: \`${item.source}\``, "", item.content.trim(), "");
+        lines.push(`## Source: \`${item.source}\``, `Type: ${item.source_type}`, "", item.content.trim(), "");
     }
     return lines.join("\n");
 }
 function staleItems(repo) {
-    return globFiles(repo, "knowledge", [".md"])
-        .filter((rel) => !rel.startsWith("knowledge/logs/") && !rel.startsWith("knowledge/assets/"))
+    return knowledgeMarkdownFiles(repo)
         .map((rel) => {
         const content = readFileSync(path.join(repo, rel), "utf8");
         const { metadata } = parseFrontmatter(content);
         if (!metadata || metadata.source_files.length === 0) {
-            return { path: rel, status: "missing_metadata", source_files: [], details: ["frontmatter or source_files missing"] };
+            return {
+                path: rel,
+                status: "missing_metadata",
+                source_files: [],
+                details: ["frontmatter or source_files missing"],
+                suggestion: `Add project-kb frontmatter or regenerate with project-kb propose for ${rel}.`,
+            };
         }
         const details = [];
         let status = "fresh";
@@ -434,21 +528,27 @@ function staleItems(repo) {
                 details.push(`${source} hash changed`);
             }
         }
-        return { path: rel, status, source_files: metadata.source_files, details };
+        return { path: rel, status, source_files: metadata.source_files, details, suggestion: staleSuggestion(rel, status) };
     });
 }
 function renderStaleMarkdown(items) {
-    return ["# Project KB Stale Report", "", ...items.map((item) => `- ${item.path}: ${item.status}${item.details.length ? ` (${item.details.join("; ")})` : ""}`), ""].join("\n");
+    return [
+        "# Project KB Stale Report",
+        "",
+        ...items.map((item) => `- ${item.path}: ${item.status}${item.details.length ? ` (${item.details.join("; ")})` : ""}; Suggestion: ${item.suggestion}`),
+        "",
+    ].join("\n");
 }
-function createProposal(repo, inputData, reason) {
+function createProposal(repo, inputData, reason, inheritSourceMetadata = false) {
     const root = proposalRoot(repo);
     ensureDir(root);
     const proposalId = `kb-${timestamp()}-${Math.floor(Math.random() * 100000)}`;
     const dir = path.join(root, proposalId);
     ensureDir(dir);
-    const sourceFiles = (inputData.source_files ?? []).filter(Boolean);
-    const sourceHashes = Object.fromEntries(sourceFiles.map((source) => [source, repoFileHash(repo, source)]));
     const targetFiles = inputData.updates.map((update) => validateKnowledgeTarget(update.target));
+    const inheritedSourceFiles = inheritSourceMetadata ? inheritedSourceFilesForTargets(repo, targetFiles) : [];
+    const sourceFiles = unique([...inheritedSourceFiles, ...(inputData.source_files ?? [])].filter(Boolean).map(normalizeRepoPath));
+    const sourceHashes = Object.fromEntries(sourceFiles.map((source) => [source, repoFileHash(repo, source)]));
     const sensitiveTargets = inputData.updates.filter((update) => hasSensitiveContent(update.content)).map((update) => validateKnowledgeTarget(update.target));
     const status = sensitiveTargets.length ? "blocked_sensitive" : "proposed";
     if (sensitiveTargets.length) {
@@ -547,6 +647,62 @@ function renderDryRunDiff(repo, operations) {
     })
         .join("\n");
 }
+function dryRunSummaryLines(diffPath, targetFiles) {
+    if (!existsSync(diffPath)) {
+        return ["- dry_run_diff: missing"];
+    }
+    const text = readFileSync(diffPath, "utf8");
+    let additions = 0;
+    let deletions = 0;
+    for (const line of text.split(/\r?\n/)) {
+        if (line.startsWith("+++") || line.startsWith("---")) {
+            continue;
+        }
+        if (line.startsWith("+"))
+            additions++;
+        if (line.startsWith("-"))
+            deletions++;
+    }
+    return [`- target_files: ${targetFiles.length ? targetFiles.join(", ") : "none"}`, `- changed_lines: +${additions} -${deletions}`];
+}
+function reviewDecision(proposal, hasStale) {
+    if (proposal.proposal_status === "blocked_sensitive" || proposal.sensitive_scan_result === "blocked") {
+        return "blocked by sensitive content; do not apply.";
+    }
+    if (hasStale) {
+        return "review stale knowledge before apply.";
+    }
+    if (proposal.proposal_status === "proposed") {
+        return "review dry-run.diff, then apply if content is correct.";
+    }
+    return `no apply action for status ${proposal.proposal_status}.`;
+}
+function staleSuggestion(pathValue, status) {
+    if (status === "fresh") {
+        return "No action needed.";
+    }
+    if (status === "missing_source") {
+        return `Check missing source file before refreshing ${pathValue}.`;
+    }
+    if (status === "missing_metadata") {
+        return `Add project-kb frontmatter or regenerate with project-kb propose for ${pathValue}.`;
+    }
+    return `Run project-kb propose with refreshed content for ${pathValue}.`;
+}
+function inheritedSourceFilesForTargets(repo, targetFiles) {
+    const sources = [];
+    for (const target of targetFiles) {
+        const targetAbs = path.join(repo, target);
+        if (!existsSync(targetAbs)) {
+            continue;
+        }
+        const { metadata } = parseFrontmatter(readFileSync(targetAbs, "utf8"));
+        if (metadata) {
+            sources.push(...metadata.source_files);
+        }
+    }
+    return unique(sources.map(normalizeRepoPath));
+}
 function hasSensitiveContent(content) {
     return [
         /password\s*[:=]\s*\S{3,}/i,
@@ -576,14 +732,32 @@ function globFiles(repo, dir, suffixes) {
     visit(abs, dir);
     return output.sort();
 }
+function knowledgeMarkdownFiles(repo) {
+    return globFiles(repo, "knowledge", [".md"]).filter((rel) => !rel.startsWith("knowledge/logs/") && !rel.startsWith("knowledge/assets/"));
+}
 function listOrNone(items) {
     return items.length ? items.map((item) => `- ${item}`) : ["- none"];
 }
 function truncate(value, budget) {
     if (value.length <= budget) {
+        return { text: value, budget_used: value.length, truncated: false };
+    }
+    const marker = "\n...(truncated)";
+    const text = budget <= marker.length ? value.slice(0, budget) : `${value.slice(0, budget - marker.length)}${marker}`;
+    return { text, budget_used: text.length, truncated: true };
+}
+function unique(values) {
+    return [...new Set(values)];
+}
+function normalizeRepoPath(value) {
+    return value.split(path.sep).join("/");
+}
+function templateFlag(flags) {
+    const value = stringFlag(flags, "template", "generic-service");
+    if (value === "generic-service" || value === "java-backend" || value === "frontend-app") {
         return value;
     }
-    return `${value.slice(0, Math.max(0, budget))}\n...(truncated)`;
+    throw usageError("init", "--template must be generic-service, java-backend, or frontend-app");
 }
 function timestamp() {
     const date = new Date();

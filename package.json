@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/liuliuyun/project-kb-core.git"
+    "url": "git+https://github.com/clclo121/project-kb-core.git"
   },
   "keywords": [
     "ai-coding",
@@ -22,6 +22,7 @@
     "dist",
     "adapters",
     "schema",
+    "templates",
     "CHANGELOG.md",
     "LICENSE",
     "README.md"
