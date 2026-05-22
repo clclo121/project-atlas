@@ -1,17 +1,19 @@
 # Agent Quickstart
 
-This document is for AI coding agents. The goal is to read governed project knowledge in the first 60 seconds of a task, check whether the knowledge base is healthy, and create reviewable proposals when knowledge should change.
+This page is for AI coding agents. The goal is to read governed project knowledge in the first 60 seconds of a task, check knowledge health, and create reviewable proposals when durable knowledge should change.
+
+If you are a human user who wants the shortest command path first, read [Quick Start](quick-start.md).
 
 ## Rules
 
-- Read Project Atlas before broad source exploration.
+- Read Project Atlas context before broad source exploration.
 - Default to read-only commands.
 - You may run `context`, `check`, `scan`, `stale`, and `review-summary`.
 - You may run `propose` and `remember` to create proposals.
 - Do not run `project-atlas apply`.
-- Do not configure `project-atlas apply` as an MCP tool, agent tool, or automatic script.
-- If `knowledge/manifest.json` is missing, do not silently initialize the repo. Tell the user and provide the init command.
-- When answering, list the knowledge files used, commands run, and any issue that still needs human review.
+- Do not configure `project-atlas apply` as an MCP tool, agent tool, hook, or automatic script.
+- If `knowledge/manifest.json` is missing, do not silently initialize the repository. Tell the user and provide the init command.
+- In your answer, list the knowledge files used, commands run, and anything that still needs human review.
 
 ## First Probe
 
@@ -29,49 +31,67 @@ If the command is missing:
 npm install -g project-atlas
 ```
 
-If the repo is not initialized, ask the user before running:
+If the repository is not initialized, ask the user before running:
 
 ```bash
 project-atlas init --repo "$PWD" --template generic-service
 ```
 
-Use `java-backend` for Java backend repos and `frontend-app` for frontend repos.
+Use `java-backend` for Java backend repositories:
+
+```bash
+project-atlas init --repo "$PWD" --template java-backend
+```
+
+Use `frontend-app` for frontend repositories:
+
+```bash
+project-atlas init --repo "$PWD" --template frontend-app
+```
 
 ## Read Context
 
-Use task keywords:
+Read context by task keywords:
 
 ```bash
 project-atlas context --repo "$PWD" --query "<task keywords>" --budget 8000 --format json
 ```
 
-If a file is mentioned:
+If the user mentions a specific file, look up knowledge by source file:
 
 ```bash
 project-atlas context --repo "$PWD" --source-file "<repo-relative-file>" --format json
 ```
 
-If project memory metadata matters:
+If the task depends on project memory metadata, filter by memory fields:
 
 ```bash
 project-atlas context --repo "$PWD" --memory-type decision --topic "<topic>" --scope "<scope>" --format json
 ```
 
-Check `items[].source_path`, `items[].source_type`, `items[].metadata`, `truncated`, and `budget_used`.
+Inspect these fields:
+
+- `items[].source_path`
+- `items[].source_type`
+- `items[].metadata`
+- `truncated`
+- `budget_used`
+
+If `truncated` is `true`, narrow the query or raise `--budget`, then read context again.
 
 ## Health Check
 
-Before proposing knowledge changes or handing off work:
+Before creating a proposal, handing off work, or preparing a release, run:
 
 ```bash
 project-atlas check --repo "$PWD" --format json
 ```
 
-Report missing sources, stale sources, missing metadata, bad links, and duplicate topics. Do not treat unhealthy knowledge as fully trusted.
+If the result reports missing sources, stale sources, missing metadata, bad links, or duplicate topics, state the risk in your answer. Do not treat unhealthy knowledge as fully trusted.
 
 ## Create A Knowledge Proposal
 
-Prepare `updates.json`:
+When the task produces durable project knowledge, prepare `updates.json`:
 
 ```json
 {
@@ -91,9 +111,15 @@ Create the proposal:
 project-atlas propose --repo "$PWD" --updates-file updates.json --reason "<why this knowledge changed>"
 ```
 
+If the target file already has source metadata and the user explicitly wants to inherit it, run:
+
+```bash
+project-atlas propose --repo "$PWD" --updates-file updates.json --reason "<why this knowledge changed>" --inherit-source-metadata
+```
+
 ## Create A Project Memory Proposal
 
-Prepare `memory.json`:
+When the task produces a durable decision, experience, or project fact, prepare `memory.json`:
 
 ```json
 {
@@ -113,27 +139,39 @@ Prepare `memory.json`:
 }
 ```
 
-Run:
+Create the memory proposal:
 
 ```bash
 project-atlas remember --repo "$PWD" --candidate-file memory.json --reason "<why this memory matters>"
 ```
 
-Allowed memory types are `decision`, `experience`, and `project_fact`.
+Allowed memory types:
+
+- `decision`
+- `experience`
+- `project_fact`
 
 ## Review Summary
 
-After creating a proposal:
+After creating a proposal, read the summary:
 
 ```bash
 project-atlas review-summary --repo "$PWD"
 ```
 
-Report the proposal id, target files, source files, dry-run summary, review decision, apply safety, and whether human apply is needed.
+Report at least:
+
+- proposal id
+- target files
+- source files
+- dry-run summary
+- review decision
+- apply safety
+- whether human terminal apply is still required
 
 ## MCP
 
-Use only these MCP tools:
+When connected through `project-atlas-mcp`, use only these safe tools:
 
 - `project_atlas_scan`
 - `project_atlas_context`
@@ -143,7 +181,7 @@ Use only these MCP tools:
 - `project_atlas_check`
 - `project_atlas_review_summary`
 
-There is no apply tool.
+There is no apply tool. If an MCP tool creates a proposal, tell the user to review it and apply it manually in a terminal.
 
 ## MCP Client Config
 
@@ -176,7 +214,14 @@ mcpServers:
     args: []
 ```
 
-## Agent Response Template
+## Safety Boundary
+
+- never let the model call `project-atlas apply`
+- never bypass proposals and write `knowledge/**` directly
+- never treat chat logs as project memory source data
+- never treat unhealthy knowledge as final truth
+
+## Response Template
 
 ```text
 Project Atlas:

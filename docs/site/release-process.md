@@ -1,37 +1,42 @@
 # 发布流程
 
-本文约定 Project Atlas 的轻量发布治理方式。当前不做自动发布，也不创建 GitHub Release。
+这份文档说明 Project Atlas 的长期发布规则。它偏治理规则，不替代当前仓库的一次性发包步骤。
 
-如果你现在就准备发布，先看 [现在发布指南](publish-now.md)。本文偏长期规则，`publish-now.md` 偏本次操作步骤。
+如果你现在就要发包，直接看 [现在发布指南](publish-now.md)。
 
 ## 版本规则
 
-使用 SemVer：
+Project Atlas 使用 SemVer：
 
-- `MAJOR` 用于不兼容的 CLI、schema 或 evidence 格式变化。
-- `MINOR` 用于新增命令、参数、schema 字段或 adapter 能力。
-- `PATCH` 用于 bug fix、文档修正和不改变行为的维护。
+- `MAJOR`
+  不兼容的 CLI、schema 或 evidence 格式变化
+- `MINOR`
+  新增命令、参数、schema 字段或 adapter 能力
+- `PATCH`
+  bug 修复、文档修正和不改变行为的维护
 
-当前公开 schema 版本为 `1.0`。不兼容 schema 变化必须更新 schema 版本，并在 changelog 中说明迁移方式。
+当前公开 schema 版本是 `1.0`。只补文档描述时不用升级 schema 版本。不兼容字段变化时必须升级 schema 版本，并在 changelog 里写清迁移方式。
 
-## Changelog
+## 发布前要更新什么
 
-每次发布前更新 `CHANGELOG.md`：
+每次发布前都要确认：
 
-- 新增能力写清楚用户能怎么用。
-- 行为变更写清楚影响范围。
-- 安全边界变化必须单独说明。
-- 依赖和 Node 版本要求变化必须说明。
+- `package.json` 版本号
+- `CHANGELOG.md`
+- 文档里的命令名和安全边界
+- `README.md` 和 `docs/site/` 的入口链接
 
-## 发布前检查
+如果本次版本改动了 CLI 行为、schema、MCP 工具范围或安全边界，changelog 里要单独写清。
+
+## 发布前固定验证
 
 发布前固定执行：
 
 ```bash
 npm run lint:types
 npm test
-npm pack --dry-run
 npm run verify
+npm pack --dry-run
 node dist/index.js --help
 node dist/index.js init --help
 node dist/index.js context --help
@@ -53,7 +58,7 @@ node dist/mcp.js --help
 - `docs/site/`
 - `package.json`
 
-不应包含：
+通常不应包含：
 
 - `test/`
 - `src/`
@@ -62,33 +67,38 @@ node dist/mcp.js --help
 
 ## 发布步骤
 
-当前项目只沉淀手工流程：
+推荐顺序如下：
 
-1. 更新版本号和 `CHANGELOG.md`。
-2. 执行发布前检查。
-3. 检查 `npm pack --dry-run` 内容。
-4. 确认当前分支干净。
-5. 创建提交。
-6. 推送到 `origin/main`。
-7. 执行 `npm login` 和 `npm whoami`。
-8. 执行 `npm publish`。
-9. 创建版本 tag 并推送。
+1. 更新版本号和 `CHANGELOG.md`
+2. 执行固定验证
+3. 检查 `npm pack --dry-run` 输出
+4. 确认工作区干净
+5. 创建提交
+6. 推送到远端主分支
+7. 执行 `npm login` 和 `npm whoami`
+8. 执行 `npm publish`
+9. 创建版本 tag 并推送
 
-首次发布当前包名时可以直接使用：
+## 发布后检查
 
-```bash
-npm publish
-git tag v0.1.0
-git push origin main --tags
-```
+发布完成后，再确认这些点：
 
-如果 npm 要求二次验证，按 npm CLI 提示完成一次性验证码输入。
+- `npm view project-atlas version`
+- `npm view project-atlas dist-tags`
+- `npm install -g project-atlas`
+- `project-atlas --help`
+- `project-atlas-mcp --help`
 
-## 当前仓库发布注意事项
+## 文档同步规则
 
-- 当前 package name 是 `project-atlas`。
-- 当前 package version 是 `0.1.0`。
-- 当前 npm registry 未发现同名包，可以按首次发布处理。
-- 发布前要确认 `CHANGELOG.md` 中 `Unreleased` 的内容已经归入要发布的版本。
-- 如果本地 `main` 领先 `origin/main`，先推送代码，再发布 npm 包。
-- 如果 GitHub 仓库还没有改名为 `project-atlas`，先改远端仓库名，或者在发布前把 `package.json` 的 repository URL 改回真实仓库地址。
+只要本次发布改动了入口体验，就要一起检查：
+
+- 根 `README.md`
+- `docs/site/README.md`
+- `docs/site/en/README.md`
+- `docs/site/quick-start.md`
+- `docs/site/en/quick-start.md`
+- `docs/site/agent-quickstart.md`
+- `docs/site/en/agent-quickstart.md`
+
+Project Atlas 的发布不仅是代码发布，也是使用方式和安全边界的发布。

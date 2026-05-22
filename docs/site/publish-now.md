@@ -1,42 +1,42 @@
 # 现在发布指南
 
-本文记录当前仓库如果要马上发布到 npm，应按什么顺序做。
+这份文档只回答一个问题。当前仓库如果今天就要发布到 npm，应该按什么顺序做。
+
+更长期的规则看 [发布流程](release-process.md)。
 
 ## 当前结论
 
-- 包名是 `project-atlas`。
-- 当前版本是 `0.1.0`。
-- npm registry 当前没有同名包，可以按首次发布处理。
-- 当前发布方式是手工发布，不做 GitHub Release，不做自动发布。
-- 发布前必须保证本地 `main` 已经推送到 `origin/main`。
-- `package.json` 当前 repository URL 指向 `project-atlas`。如果 GitHub 仓库还没有改名，先完成仓库改名，或者把 repository URL 调整为当前真实仓库。
+- 包名是 `project-atlas`
+- 当前版本是 `0.1.0`
+- 当前发布方式是手工发布
+- 当前不做 GitHub Release
+- 发布前应保证本地主分支已经同步到远端
+- `README.md` 和 `docs/site/` 已经是 npm 包的一部分，发包前要一起检查
 
-## 发布前整理
-
-先确认工作区和分支状态：
+## 先看工作区状态
 
 ```bash
 git status --branch --short
+git remote -v
 ```
 
-如果看到 `main...origin/main [ahead 1]`，说明本地有提交还没有推送。先推送：
+如果本地主分支领先远端，先推送：
 
 ```bash
 git push origin main
 ```
 
-确认 `CHANGELOG.md`。如果你要发布 `0.1.0`，就把本次要发布的 `Unreleased` 内容归入 `0.1.0`，或者确认 `Unreleased` 只保留下一版内容。
+## 发布前检查清单
 
-确认 GitHub 远端名称。如果要让 npm 页面指向 Project Atlas 仓库，先在 GitHub 上把仓库改名为 `project-atlas`，再更新本地 remote：
+先确认这些文件是当前版本：
 
-```bash
-git remote set-url origin https://github.com/clclo121/project-atlas.git
-git remote -v
-```
+- `package.json`
+- `CHANGELOG.md`
+- `README.md`
+- `docs/site/README.md`
+- `docs/site/en/README.md`
 
-## 本地验证
-
-固定执行：
+再执行固定验证：
 
 ```bash
 npm run lint:types
@@ -52,6 +52,8 @@ node dist/index.js check --help
 node dist/mcp.js --help
 ```
 
+## 检查打包内容
+
 `npm pack --dry-run` 应包含：
 
 - `README.md`
@@ -64,7 +66,7 @@ node dist/mcp.js --help
 - `docs/site/`
 - `package.json`
 
-不应包含：
+通常不应包含：
 
 - `test/`
 - `src/`
@@ -73,94 +75,63 @@ node dist/mcp.js --help
 
 ## npm 登录
 
-确认 npm registry：
+确认当前 registry：
 
 ```bash
 npm config get registry
 ```
 
-期望是：
-
-```text
-https://registry.npmjs.org/
-```
-
-登录并确认账号：
+确认登录身份：
 
 ```bash
 npm login
 npm whoami
 ```
 
-如果开启了两步验证，按 npm CLI 提示输入验证码。
+## 正式发布
 
-## 首次发布
-
-发布前再次确认版本：
-
-```bash
-node -p "require('./package.json').name + '@' + require('./package.json').version"
-```
-
-当前应输出：
-
-```text
-project-atlas@0.1.0
-```
-
-执行发布：
+确认工作区干净后执行：
 
 ```bash
 npm publish
 ```
 
-当前是非 scoped 包，不需要 `--access public`。如果以后改成 `@scope/project-atlas` 这类 scoped 包，再使用：
-
-```bash
-npm publish --access public
-```
+如果以后要做测试发布，再补 `--tag`。当前这份文档只覆盖正式默认发布。
 
 ## 发布后验证
 
-确认 npm 上的版本：
+发布完成后检查：
 
 ```bash
 npm view project-atlas version
+npm view project-atlas dist-tags
 ```
 
-用临时目录安装验证：
+再做一次安装验证：
 
 ```bash
-tmpdir=$(mktemp -d)
-cd "$tmpdir"
-npm init -y
-npm install project-atlas
-npx project-atlas --help
-npx project-atlas-mcp --help
+npm install -g project-atlas
+project-atlas --help
+project-atlas-mcp --help
 ```
 
-## 打 tag 和推送
+## 打 tag 并推送
 
-npm 发布成功后再打 tag：
+如果发布成功，再补版本 tag：
 
 ```bash
 git tag v0.1.0
-git push origin main --tags
+git push origin v0.1.0
 ```
 
-如果 tag 已存在，不要覆盖。先检查：
+如果本次发布版本不是 `0.1.0`，把 tag 名改成真实版本号。
 
-```bash
-git tag --list "v0.1.0"
-```
+## 失败时先看什么
 
-## 失败处理
+常见回看顺序如下：
 
-如果 `npm publish` 失败：
-
-- `403 Forbidden` 通常是没有权限、包名不可用、账号未登录或版本已存在。
-- `402 Payment Required` 通常和私有包或组织权限有关，当前项目应发布为 public。
-- `ENEEDAUTH` 表示没有登录，重新执行 `npm login`。
-- `You cannot publish over the previously published versions` 表示版本号已发布，需要升级 `package.json` 版本。
-
-不要在发布失败后直接改 tag。只有 npm 发布成功后才创建版本 tag。
+1. `npm whoami` 是否是预期账号
+2. `npm pack --dry-run` 是否缺少文档或构建产物
+3. `npm test` 和 `npm run verify` 是否真的通过
+4. `README.md` 和 `docs/site/` 的链接是否仍然正确
+5. `package.json` 里的版本号和仓库信息是否正确

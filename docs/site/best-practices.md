@@ -1,87 +1,96 @@
-# Project Atlas 最佳实践
+# 最佳实践
 
-Project Atlas 适合沉淀稳定、可验证、会被多次复用的项目知识。它不适合自动生成整仓长文档。
+Project Atlas 适合沉淀稳定、可验证、会被反复复用的项目知识。它不适合把整仓扫描结果原样堆成一大份长文档。
 
-## 写什么
+## 适合写什么
 
-- 项目定位和模块边界。
-- 业务术语和页面、接口、任务的真实含义。
-- 稳定流程，比如订单、支付、审核、同步。
-- 对外契约，比如 API、MQ、文件、配置。
-- 风险点，比如敏感配置、人工操作、迁移约束。
-- 已经确认的技术或业务决策。
-- 可复用项目记忆，比如稳定事实、已做决策和踩坑经验。
+优先写这些内容：
 
-## 不写什么
+- 项目定位、模块边界、目录职责
+- 业务术语和关键页面、接口、任务的真实含义
+- 稳定流程，比如下单、支付、审核、同步
+- 对外契约，比如 API、MQ、文件格式、配置约束
+- 风险点，比如敏感配置、人工步骤、迁移前提
+- 已经确认的技术决策和业务决策
+- 已经验证过的项目记忆，比如稳定事实、经验和结论
 
-- 临时调试过程。
-- 未验证的猜测。
-- 大段源码复制。
-- 过期设计稿。
-- 密钥、token、密码和真实敏感配置值。
+## 不适合写什么
 
-## 来源文件
+不要把这些内容直接沉淀进知识库：
 
-每篇知识文档都应该能追溯到来源文件。建议优先引用：
+- 临时排障过程
+- 还没验证的猜测
+- 大段源码复制
+- 已经过期的设计稿
+- 密钥、token、密码和真实敏感值
+- 只属于个人偏好的操作习惯
 
-- README 和需求文档。
-- OpenSpec 规格。
-- 关键源码入口。
-- 配置样例。
-- 已确认的开发日志。
+## 来源要足够清楚
 
-`source_files` 和 `source_hashes` 可以让 stale 检测发现知识是否过期。
+每篇知识文档都应该能追溯到来源文件。常见优先级如下：
 
-## 项目记忆
+1. README、需求文档、发布说明
+2. OpenSpec 或其他正式规格
+3. 关键源码入口和配置样例
+4. 已确认的开发日志和 review 结论
 
-项目记忆适合写三类内容：
+`source_files` 和 `source_hashes` 不是装饰字段。它们决定 `stale` 能不能发现知识过期。
 
-- `decision` 记录已经确认的决策，适合后续任务直接遵守。
-- `experience` 记录完成过的工作经验，适合避免重复试错。
-- `project_fact` 记录稳定项目事实，适合新任务快速理解背景。
+## 项目记忆怎么写
 
-记忆内容必须有来源。来源可以是 README、开发日志、OpenSpec、关键代码入口或 review 结论。不要把个人偏好、未验证猜测和聊天原文写成项目记忆。
+项目记忆适合三类内容：
 
-建议把记忆目标放在合适目录：
+- `decision`
+  已经确认并需要长期遵守的决策
+- `experience`
+  已完成任务里有复用价值的经验
+- `project_fact`
+  稳定、客观、可复用的项目事实
 
-- 决策放 `knowledge/decisions/`。
-- 业务事实放 `knowledge/domains/` 或 `knowledge/project/`。
-- 经验放最接近的业务或质量目录。
+项目记忆也必须有来源。推荐来源包括 README、开发日志、正式规格、关键代码入口和 review 结论。
 
-生成记忆 proposal：
+不要把聊天原文、个人猜测和未经验证的结论写成项目记忆。
 
-```bash
-project-atlas remember --repo /path/to/repo --candidate-file memory.json --reason "capture stable project memory"
-```
+## 目录怎么选
 
-默认不会覆盖已有目标文件。确实要替换时，显式加 `--replace-existing`，并在 review 中说明原因。
+把知识放到最接近的目录：
+
+- 决策放 `knowledge/decisions/`
+- 项目背景放 `knowledge/project/`
+- 业务事实放 `knowledge/domains/`
+- 流程说明放 `knowledge/workflows/`
+- 契约和集成说明放 `knowledge/contracts/` 或 `knowledge/integrations/`
+- 质量要求和排查经验放 `knowledge/quality/`
 
 ## 更新节奏
 
-- 小改动只在需要时更新相关知识。
-- 跨模块需求完成后，运行 `scan` 和 `stale`。
-- 由 agent 生成 proposal，由人 review 后再 apply。
-- 每次发布前确认 `review-summary` 没有敏感阻断。
-- 发布前或交接前运行 `project-atlas check`，确认知识库健康。
+推荐的节奏很简单：
+
+1. 任务开始前先读 `context`
+2. 任务结束后判断有没有稳定知识变化
+3. 有变化再生成 `propose` 或 `remember`
+4. reviewer 先看 `review-summary`
+5. 最后由人执行 `apply`
+
+跨模块需求、发布前和交接前，建议补跑：
+
+```bash
+project-atlas check --repo /path/to/repo --format json
+project-atlas stale --repo /path/to/repo
+```
 
 ## Agent 使用建议
 
-Agent 开始任务前先读：
+agent 不要一上来就全仓搜索。先读：
 
 ```bash
-project-atlas context --repo /path/to/repo --query "<task topic>"
+project-atlas context --repo /path/to/repo --query "<task topic>" --budget 8000 --format json
 ```
 
-任务结束后，如果稳定知识发生变化，再生成 proposal：
+任务结束后，如果要更新知识库，再生成 proposal：
 
 ```bash
 project-atlas propose --repo /path/to/repo --updates-file updates.json --reason "refresh project knowledge"
 ```
 
-如果任务沉淀的是项目记忆，使用：
-
-```bash
-project-atlas remember --repo /path/to/repo --candidate-file memory.json --reason "capture task memory"
-```
-
-Project Atlas 的重点是让团队少重复解释项目背景，同时保留人工把关。
+Project Atlas 的目标不是让文档越来越多，而是让真正可复用的知识越来越可信。

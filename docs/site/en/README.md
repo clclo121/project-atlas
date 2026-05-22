@@ -1,49 +1,62 @@
 # Project Atlas Documentation
 
-Project Atlas is a Git-first project knowledge base CLI for engineering teams and AI coding agents.
+Project Atlas is a Git-first project knowledge base CLI for open source maintainers, engineering teams, and AI coding agents.
 
-The npm package is `project-atlas`. The CLI command is `project-atlas`. The local stdio MCP server is `project-atlas-mcp`.
-
-## Start Here
-
-If you are an AI agent, read [Agent Quickstart](agent-quickstart.md) first. It is written as an execution protocol, not as a long tutorial.
-
-If you are setting up the tool manually, read [Quick Start](quick-start.md).
+It stores durable project knowledge under `knowledge/`, turns knowledge updates into reviewable proposals, and keeps final writes behind a human terminal confirmation.
 
 Chinese documentation is available at [../README.md](../README.md).
 
-## Core Boundary
+## What To Expect
 
-Project Atlas stores shared project knowledge under `knowledge/` and local proposal evidence under `.project-atlas/proposals/`.
+Project Atlas is useful when you want to:
 
-Agents may read context and create proposals. Agents must not apply proposals. Real writes still require a human terminal confirmation through:
+- give AI agents trusted project context before broad source exploration
+- keep stable project knowledge in Git instead of scattered chat history
+- review knowledge changes with source evidence and hashes
+- capture durable project memory without allowing automatic writes
 
-```bash
-project-atlas apply --repo /path/to/repo --proposal-id <id> --confirm
-```
+Its core boundary stays simple:
 
-## Common Commands
+- agents may read context and create proposals
+- agents must not run `project-atlas apply`
+- real writes still require a human terminal confirmation
 
-```bash
-project-atlas init --repo /path/to/repo --template generic-service
-project-atlas context --repo /path/to/repo --query "order payment" --budget 8000 --format json
-project-atlas check --repo /path/to/repo --format json
-project-atlas propose --repo /path/to/repo --updates-file updates.json --reason "refresh knowledge"
-project-atlas remember --repo /path/to/repo --candidate-file memory.json --reason "capture project memory"
-project-atlas review-summary --repo /path/to/repo
-project-atlas-mcp --help
-```
+## Start With One Path
 
-## MCP Tools
+Choose the shortest route for your goal:
 
-The MCP server exposes only safe tools:
+- Try it now
+  Read [Quick Start](quick-start.md)
+- Integrate an agent
+  Read [Agent Quickstart](agent-quickstart.md)
+- Publish this repo
+  Read [Publish Now](publish-now.md)
 
-- `project_atlas_scan`
-- `project_atlas_context`
-- `project_atlas_stale`
-- `project_atlas_propose`
-- `project_atlas_remember`
-- `project_atlas_check`
-- `project_atlas_review_summary`
+## Documentation Map
 
-No MCP apply tool exists.
+- [Quick Start](quick-start.md)
+  The shortest path for a first successful run
+- [Agent Quickstart](agent-quickstart.md)
+  The execution protocol for agent and MCP usage
+- [Best Practices](best-practices.md)
+  What knowledge to keep, what to leave out, and how to keep it trustworthy
+- [Team Rollout](team-rollout.md)
+  A practical order for introducing Project Atlas to a team
+- [Security FAQ](security-faq.md)
+  Why apply is manual and how sensitive evidence is handled
+- [Release Process](release-process.md)
+  The long-term release policy for this package
+- [Publish Now](publish-now.md)
+  The current repository-specific release checklist
+
+## Typical Flow
+
+The most common sequence is:
+
+1. run `init` to create the knowledge base skeleton
+2. run `context` to read governed project context
+3. run `propose` or `remember` to create reviewable updates
+4. run `review-summary` before approval
+5. let a human run `apply` in a terminal
+
+If you want commands first, start with [Quick Start](quick-start.md).

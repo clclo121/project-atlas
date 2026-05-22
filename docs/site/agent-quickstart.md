@@ -1,23 +1,23 @@
-# Agent Quickstart
+# Project Atlas Agent 快速接入
 
-This document is for AI coding agents. Its purpose is to make Project Atlas usable in the first 60 seconds of a task.
+这份文档给 AI 编程 agent 使用。目标是在任务开始后的前 60 秒内，先读取治理后的项目知识，再判断知识库是否健康，最后在需要时生成可审核的 proposal。
 
-Agents should read governed project knowledge before broad source exploration, check whether the knowledge base is healthy, and create reviewable proposals when durable knowledge should change.
+如果你是人工用户，想先跑一遍命令，先看 [快速开始](quick-start.md)。
 
-## Rules
+## 基本规则
 
-- Read Project Atlas before broad source exploration.
-- Default to read-only commands.
-- You may run `context`, `check`, `scan`, `stale`, and `review-summary`.
-- You may run `propose` and `remember` to create proposals.
-- Do not run `project-atlas apply`.
-- Do not configure `project-atlas apply` as an MCP tool, agent tool, hook, or automatic script.
-- If `knowledge/manifest.json` is missing, do not silently initialize the repository. Tell the user and provide the init command.
-- When answering, list the knowledge files used, commands run, and anything that still needs human review.
+- 在大范围搜索源码之前，先读取 Project Atlas 上下文
+- 默认优先使用只读命令
+- 可以运行 `context`、`check`、`scan`、`stale`、`review-summary`
+- 可以运行 `propose` 和 `remember` 来生成 proposal
+- 不要运行 `project-atlas apply`
+- 不要把 `project-atlas apply` 配成 MCP 工具、agent 工具、hook 或自动脚本
+- 如果缺少 `knowledge/manifest.json`，不要静默初始化仓库，要先提示用户并给出命令
+- 回答用户时，要说明读取了哪些知识文件、执行了哪些命令、哪些点还需要人工 review
 
 ## First Probe
 
-Run from the repository root:
+在仓库根目录先运行：
 
 ```bash
 command -v project-atlas
@@ -25,51 +25,51 @@ project-atlas --help
 test -f knowledge/manifest.json && echo "project-atlas: initialized" || echo "project-atlas: missing manifest"
 ```
 
-If the command is missing:
+如果命令不存在：
 
 ```bash
 npm install -g project-atlas
 ```
 
-If the repository is not initialized, ask the user before running:
+如果仓库还没有初始化，先征得用户同意，再执行：
 
 ```bash
 project-atlas init --repo "$PWD" --template generic-service
 ```
 
-Use `java-backend` for Java backend repositories:
+Java 后端仓库可以使用：
 
 ```bash
 project-atlas init --repo "$PWD" --template java-backend
 ```
 
-Use `frontend-app` for frontend repositories:
+前端仓库可以使用：
 
 ```bash
 project-atlas init --repo "$PWD" --template frontend-app
 ```
 
-## Read Context Before The Task
+## Read Context
 
-Use the task title, requirement keywords, or module names mentioned by the user:
+按任务关键词读取上下文：
 
 ```bash
 project-atlas context --repo "$PWD" --query "<task keywords>" --budget 8000 --format json
 ```
 
-If the user mentions a specific file, look up knowledge by source file:
+如果用户提到了具体文件，按来源文件反查：
 
 ```bash
 project-atlas context --repo "$PWD" --source-file "<repo-relative-file>" --format json
 ```
 
-If the task depends on project memory metadata, filter by memory metadata:
+如果任务依赖项目记忆元数据，按记忆字段过滤：
 
 ```bash
 project-atlas context --repo "$PWD" --memory-type decision --topic "<topic>" --scope "<scope>" --format json
 ```
 
-When reading JSON output, inspect:
+重点查看这些字段：
 
 - `items[].source_path`
 - `items[].source_type`
@@ -77,21 +77,21 @@ When reading JSON output, inspect:
 - `truncated`
 - `budget_used`
 
-If `truncated` is `true`, narrow `--query` or raise `--budget`, then read context again.
+如果 `truncated` 为 `true`，缩小关键词范围或增大 `--budget` 后再读一次。
 
 ## Health Check
 
-Before creating a proposal, handing off work, or preparing a release, run:
+在生成 proposal、交接结果或准备发布前，先运行：
 
 ```bash
 project-atlas check --repo "$PWD" --format json
 ```
 
-If the result reports missing sources, stale sources, missing metadata, bad links, or duplicate topics, mention the risk in your answer. Do not treat unhealthy knowledge as fully trusted.
+如果结果里出现 missing sources、stale sources、missing metadata、bad links 或 duplicate topics，要在回答里明确说出风险，不要把这些知识当成完全可信。
 
 ## Create A Knowledge Proposal
 
-When the task produces durable project knowledge, prepare `updates.json`:
+当任务产生了稳定项目知识时，先准备 `updates.json`：
 
 ```json
 {
@@ -105,13 +105,13 @@ When the task produces durable project knowledge, prepare `updates.json`:
 }
 ```
 
-Create the proposal:
+然后生成 proposal：
 
 ```bash
 project-atlas propose --repo "$PWD" --updates-file updates.json --reason "<why this knowledge changed>"
 ```
 
-If the target knowledge document already has source metadata and the user explicitly wants to inherit it, run:
+如果目标知识文件已经带有来源元数据，并且用户明确要求继承旧来源信息，再使用：
 
 ```bash
 project-atlas propose --repo "$PWD" --updates-file updates.json --reason "<why this knowledge changed>" --inherit-source-metadata
@@ -119,7 +119,7 @@ project-atlas propose --repo "$PWD" --updates-file updates.json --reason "<why t
 
 ## Create A Project Memory Proposal
 
-When the task produces a durable decision, experience, or project fact, prepare `memory.json`:
+当任务产生了稳定决策、经验或项目事实时，准备 `memory.json`：
 
 ```json
 {
@@ -139,13 +139,13 @@ When the task produces a durable decision, experience, or project fact, prepare 
 }
 ```
 
-Create the memory proposal:
+生成项目记忆 proposal：
 
 ```bash
 project-atlas remember --repo "$PWD" --candidate-file memory.json --reason "<why this memory matters>"
 ```
 
-Allowed memory types:
+允许的记忆类型有三种：
 
 - `decision`
 - `experience`
@@ -153,25 +153,25 @@ Allowed memory types:
 
 ## Review Summary
 
-After creating a proposal, read the review summary:
+生成 proposal 后，立刻查看摘要：
 
 ```bash
 project-atlas review-summary --repo "$PWD"
 ```
 
-Report:
+回答里至少要带上这些信息：
 
 - proposal id
 - target files
 - source files
-- dry-run summary
+- dry-run 摘要
 - review decision
 - apply safety
-- whether human terminal apply is required
+- 是否还需要人工终端 apply
 
-## MCP Tools
+## MCP
 
-When connected through `project-atlas-mcp`, use only these tools:
+通过 `project-atlas-mcp` 接入时，只使用这些安全工具：
 
 - `project_atlas_scan`
 - `project_atlas_context`
@@ -181,17 +181,17 @@ When connected through `project-atlas-mcp`, use only these tools:
 - `project_atlas_check`
 - `project_atlas_review_summary`
 
-There is no apply tool. If an MCP tool creates a proposal, tell the user to review it and apply it manually in a terminal.
+没有 apply tool。只要 MCP 工具生成了 proposal，就要提醒用户回到终端人工 review 和 apply。
 
 ## MCP Client Config
 
-Claude Code:
+Claude Code：
 
 ```bash
 claude mcp add --transport stdio project-atlas -- project-atlas-mcp
 ```
 
-Cursor project config `.cursor/mcp.json`:
+Cursor 项目配置 `.cursor/mcp.json`：
 
 ```json
 {
@@ -205,7 +205,7 @@ Cursor project config `.cursor/mcp.json`:
 }
 ```
 
-Continue config:
+Continue 配置：
 
 ```yaml
 mcpServers:
@@ -214,21 +214,14 @@ mcpServers:
     args: []
 ```
 
-## AGENTS.md Snippet
+## 安全边界
 
-```md
-Before changing code, run Project Atlas context for the current task:
+- 不要让模型直接调用 `project-atlas apply`
+- 不要绕过 proposal 直接写 `knowledge/**`
+- 不要把聊天记录当成项目记忆来源
+- 不要把不健康的知识库结果当成最终事实
 
-project-atlas context --repo "$PWD" --query "<task keywords>" --budget 8000 --format json
-
-If a file is mentioned, also run:
-
-project-atlas context --repo "$PWD" --source-file "<repo-relative-file>" --format json
-
-Use Project Atlas outputs as governed project knowledge. You may run check, scan, stale, propose, remember, and review-summary. Do not run project-atlas apply. If knowledge should be updated, create a proposal and tell the user to review and apply it manually in a terminal.
-```
-
-## Agent Response Template
+## 回答模板
 
 ```text
 Project Atlas:

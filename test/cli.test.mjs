@@ -1411,25 +1411,41 @@ test("P3 governance assets define docs site, CI matrix, and release scripts", ()
 
   const readme = readFileSync(path.join(projectRoot, "README.md"), "utf8");
   assert.match(readme, /docs\/site\/README\.md/);
-  assert.match(readme, /docs\/site\/agent-quickstart\.md/);
   assert.match(readme, /docs\/site\/en\/README\.md/);
-  assert.match(readme, /docs\/site\/en\/agent-quickstart\.md/);
+  assert.match(readme, /docs\/site\/quick-start\.md/);
+  assert.match(readme, /docs\/site\/en\/quick-start\.md/);
   assert.ok(packageJson.files.includes("docs/site"), "npm package should include docs/site because README links to it");
   assert.ok(packageJson.files.includes("CONTRIBUTING.md"), "npm package should include contributing guidance");
   assert.ok(packageJson.files.includes("SECURITY.md"), "npm package should include security policy");
 
-  const agentQuickstart = readFileSync(path.join(projectRoot, "docs/site/agent-quickstart.md"), "utf8");
-  assert.match(agentQuickstart, /project-atlas context/);
-  assert.match(agentQuickstart, /project-atlas check/);
-  assert.match(agentQuickstart, /project_atlas_context/);
-  assert.match(agentQuickstart, /Do not run `project-atlas apply`/);
-  assert.doesNotMatch(agentQuickstart, /\p{Script=Han}/u);
+  const agentDocs = [
+    path.join(projectRoot, "docs/site/agent-quickstart.md"),
+    path.join(projectRoot, "docs/site/en/agent-quickstart.md"),
+  ];
+  for (const filePath of agentDocs) {
+    const agentQuickstart = readFileSync(filePath, "utf8");
+    assert.match(agentQuickstart, /project-atlas context/);
+    assert.match(agentQuickstart, /project-atlas check/);
+    assert.match(agentQuickstart, /project-atlas remember/);
+    assert.match(agentQuickstart, /project_atlas_context/);
+    assert.match(agentQuickstart, /project_atlas_review_summary/);
+    assert.match(agentQuickstart, /project-atlas apply/);
+  }
 
-  const englishSiteFiles = ["README.md", "agent-quickstart.md", "quick-start.md"];
+  const englishSiteFiles = [
+    "README.md",
+    "agent-quickstart.md",
+    "quick-start.md",
+    "best-practices.md",
+    "team-rollout.md",
+    "security-faq.md",
+    "release-process.md",
+    "publish-now.md",
+  ];
   for (const file of englishSiteFiles) {
     const filePath = path.join(projectRoot, "docs/site/en", file);
     assert.ok(existsSync(filePath), `docs/site/en/${file} should exist`);
-    assert.match(readFileSync(filePath, "utf8"), /Project Atlas|agent|knowledge|context/i);
+    assert.match(readFileSync(filePath, "utf8"), /Project Atlas|knowledge|agent|release|security|publish/i);
   }
 
   const ciPath = path.join(projectRoot, ".github/workflows/ci.yml");
