@@ -1,6 +1,6 @@
-# Project KB 文档
+# Project Atlas 文档
 
-这里是 `project-kb-core` 的轻量文档入口。文档保持 Markdown 形态，方便直接在 GitHub、编辑器或团队知识库里阅读。
+这里是 `project-atlas` 的轻量文档入口。文档保持 Markdown 形态，方便直接在 GitHub、编辑器或团队知识库里阅读。
 
 ## 推荐阅读顺序
 
@@ -9,31 +9,34 @@
 3. [团队落地流程](team-rollout.md)
 4. [安全 FAQ](security-faq.md)
 5. [发布流程](release-process.md)
+6. [现在发布指南](publish-now.md)
 
 ## 10 分钟体验路径
 
 ```bash
 npm install
 npm run build
-node dist/index.js init --repo /tmp/project-kb-demo
-node dist/index.js context --repo /tmp/project-kb-demo --query demo
-node dist/index.js propose --repo /tmp/project-kb-demo --updates-file updates.json --reason "demo update"
-node dist/index.js review-summary --repo /tmp/project-kb-demo
-node dist/index.js check --repo /tmp/project-kb-demo
+node dist/index.js init --repo /tmp/project-atlas-demo
+node dist/index.js context --repo /tmp/project-atlas-demo --query demo
+node dist/index.js propose --repo /tmp/project-atlas-demo --updates-file updates.json --reason "demo update"
+node dist/index.js review-summary --repo /tmp/project-atlas-demo
+node dist/index.js check --repo /tmp/project-atlas-demo
 ```
 
 真实写入仍然要由人回到终端执行：
 
 ```bash
-node dist/index.js apply --repo /tmp/project-kb-demo --proposal-id <id> --confirm
+node dist/index.js apply --repo /tmp/project-atlas-demo --proposal-id <id> --confirm
 ```
 
-Project KB 的核心边界是清楚的。Agent 可以读取上下文和生成 proposal，不能直接 apply。
+Project Atlas 的核心边界是清楚的。Agent 可以读取上下文和生成 proposal，不能直接 apply。
 
 如果要沉淀项目级记忆，先准备结构化 JSON 候选文件，再生成 proposal：
 
 ```bash
-node dist/index.js remember --repo /tmp/project-kb-demo --candidate-file memory.json --reason "capture project memory"
+node dist/index.js remember --repo /tmp/project-atlas-demo --candidate-file memory.json --reason "capture project memory"
 ```
 
 项目记忆仍然写入 `knowledge/`。它是团队共享知识，不读取个人聊天记录，也不绕过 review。
+
+准备发布 npm 包时，先看 [现在发布指南](publish-now.md)。它给出当前仓库可直接执行的发布前检查、npm 登录、首次发布、打 tag 和推送步骤。

@@ -1,6 +1,6 @@
 # 团队落地流程
 
-Project KB 的团队落地建议从一个项目开始，不要一开始就要求所有项目统一迁移。
+Project Atlas 的团队落地建议从一个项目开始，不要一开始就要求所有项目统一迁移。
 
 ## 第一步 选择试点项目
 
@@ -16,7 +16,7 @@ Project KB 的团队落地建议从一个项目开始，不要一开始就要求
 由项目负责人执行：
 
 ```bash
-project-kb init --repo /path/to/repo --template generic-service
+project-atlas init --repo /path/to/repo --template generic-service
 ```
 
 Java 后端、前端项目可以选择对应模板。
@@ -25,24 +25,24 @@ Java 后端、前端项目可以选择对应模板。
 
 建议团队约定：
 
-- 需求开始前，agent 先读 `project-kb context`。
+- 需求开始前，agent 先读 `project-atlas context`。
 - 需求结束后，只更新确实稳定的知识。
-- 所有知识更新先走 `project-kb propose`。
-- 项目记忆先走 `project-kb remember`，再由人 review。
-- reviewer 先读 `project-kb review-summary`。
+- 所有知识更新先走 `project-atlas propose`。
+- 项目记忆先走 `project-atlas remember`，再由人 review。
+- reviewer 先读 `project-atlas review-summary`。
 - 只有人能执行终端 apply。
 
 ## 第四步 接入 agent
 
 本地 agent 可以选一种方式：
 
-- 直接调用 `project-kb` CLI。
+- 直接调用 `project-atlas` CLI。
 - 使用 OpenCode adapter。
-- 使用 `project-kb-mcp` 接入 Claude Code、Cursor 或 Continue。
+- 使用 `project-atlas-mcp` 接入 Claude Code、Cursor 或 Continue。
 
 所有 adapter 都保持同一条安全边界。agent 可以生成 proposal，不能直接写入知识库。
 
-MCP 里的 `project_kb_remember` 和 `project_kb_check` 也是安全工具。前者只生成记忆 proposal，后者只做健康检查。
+MCP 里的 `project_atlas_remember` 和 `project_atlas_check` 也是安全工具。前者只生成记忆 proposal，后者只做健康检查。
 
 ## 第五步 固定检查点
 
@@ -54,6 +54,6 @@ MCP 里的 `project_kb_remember` 和 `project_kb_check` 也是安全工具。前
 - 关键接口或流程调整后。
 - 决策、经验或项目事实被写入记忆前。
 
-建议把 `project-kb check --repo /path/to/repo --format json` 放进团队本地检查清单。它能在 review 前暴露缺来源、过期来源、坏链接和重复 topic。
+建议把 `project-atlas check --repo /path/to/repo --format json` 放进团队本地检查清单。它能在 review 前暴露缺来源、过期来源、坏链接和重复 topic。
 
 团队落地的目标不是文档越多越好，而是让可复用知识保持可信。

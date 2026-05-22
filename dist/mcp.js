@@ -3,31 +3,31 @@ import { McpServer, StdioServerTransport } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { runCliCapture } from "./core.js";
 const help = [
-    "Usage: project-kb-mcp",
+    "Usage: project-atlas-mcp",
     "",
-    "Starts the local stdio MCP server for project-kb.",
+    "Starts the local stdio MCP server for project-atlas.",
     "",
     "Tools:",
-    "  project_kb_scan",
-    "  project_kb_context",
-    "  project_kb_stale",
-    "  project_kb_propose",
-    "  project_kb_remember",
-    "  project_kb_check",
-    "  project_kb_review_summary",
+    "  project_atlas_scan",
+    "  project_atlas_context",
+    "  project_atlas_stale",
+    "  project_atlas_propose",
+    "  project_atlas_remember",
+    "  project_atlas_check",
+    "  project_atlas_review_summary",
     "",
-    "No apply tool is exposed. A human must run project-kb apply in a terminal.",
+    "No apply tool is exposed. A human must run project-atlas apply in a terminal.",
 ].join("\n");
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
     console.log(help);
     process.exit(0);
 }
 const server = new McpServer({
-    name: "project-kb-core",
+    name: "project-atlas",
     version: "0.1.0",
 });
-server.registerTool("project_kb_scan", {
-    title: "Project KB Scan",
+server.registerTool("project_atlas_scan", {
+    title: "Project Atlas Scan",
     description: "Scan project shape and optional external code evidence. This tool does not write knowledge files.",
     inputSchema: z.object({
         repo: z.string().optional().describe("Git repository path. Defaults to the MCP server working directory."),
@@ -42,9 +42,9 @@ server.registerTool("project_kb_scan", {
     mode || "full",
     ...flag("external-evidence-file", external_evidence_file),
 ]));
-server.registerTool("project_kb_context", {
-    title: "Project KB Context",
-    description: "Read a compact project-kb context pack. This tool never writes files.",
+server.registerTool("project_atlas_context", {
+    title: "Project Atlas Context",
+    description: "Read a compact project-atlas context pack. This tool never writes files.",
     inputSchema: z.object({
         repo: z.string().optional().describe("Git repository path. Defaults to the MCP server working directory."),
         query: z.string().optional().describe("One or more keywords. Any keyword may match."),
@@ -67,16 +67,16 @@ server.registerTool("project_kb_context", {
     ...flag("budget", budget),
     ...flag("format", format),
 ]));
-server.registerTool("project_kb_stale", {
-    title: "Project KB Stale",
+server.registerTool("project_atlas_stale", {
+    title: "Project Atlas Stale",
     description: "Check knowledge docs against source file hashes. This tool never writes files.",
     inputSchema: z.object({
         repo: z.string().optional().describe("Git repository path. Defaults to the MCP server working directory."),
         format: z.enum(["markdown", "json"]).optional().describe("Output format. Defaults to markdown."),
     }),
 }, async ({ repo, format }) => cliTool(["stale", "--repo", repo || process.cwd(), ...flag("format", format)]));
-server.registerTool("project_kb_propose", {
-    title: "Project KB Propose",
+server.registerTool("project_atlas_propose", {
+    title: "Project Atlas Propose",
     description: "Create reviewable knowledge update evidence. This tool cannot apply the proposal.",
     inputSchema: z.object({
         repo: z.string().optional().describe("Git repository path. Defaults to the MCP server working directory."),
@@ -99,10 +99,10 @@ server.registerTool("project_kb_propose", {
         ...flag("reason", reason),
         ...(inherit_source_metadata ? ["--inherit-source-metadata"] : []),
     ]);
-    return appendText(output, "\nNo apply tool is available. A human must run project-kb apply in a terminal.");
+    return appendText(output, "\nNo apply tool is available. A human must run project-atlas apply in a terminal.");
 });
-server.registerTool("project_kb_remember", {
-    title: "Project KB Remember",
+server.registerTool("project_atlas_remember", {
+    title: "Project Atlas Remember",
     description: "Create reviewable project memory update evidence. This tool cannot apply the proposal.",
     inputSchema: z.object({
         repo: z.string().optional().describe("Git repository path. Defaults to the MCP server working directory."),
@@ -123,18 +123,18 @@ server.registerTool("project_kb_remember", {
         ...flag("format", format),
         ...(replace_existing ? ["--replace-existing"] : []),
     ]);
-    return appendText(output, "\nNo apply tool is available. A human must run project-kb apply in a terminal.");
+    return appendText(output, "\nNo apply tool is available. A human must run project-atlas apply in a terminal.");
 });
-server.registerTool("project_kb_check", {
-    title: "Project KB Check",
+server.registerTool("project_atlas_check", {
+    title: "Project Atlas Check",
     description: "Check project knowledge health. This tool never writes files.",
     inputSchema: z.object({
         repo: z.string().optional().describe("Git repository path. Defaults to the MCP server working directory."),
         format: z.enum(["markdown", "json"]).optional().describe("Output format. Defaults to markdown."),
     }),
 }, async ({ repo, format }) => cliTool(["check", "--repo", repo || process.cwd(), ...flag("format", format)]));
-server.registerTool("project_kb_review_summary", {
-    title: "Project KB Review Summary",
+server.registerTool("project_atlas_review_summary", {
+    title: "Project Atlas Review Summary",
     description: "Print reviewer-friendly proposal evidence. This tool never applies proposals.",
     inputSchema: z.object({
         repo: z.string().optional().describe("Git repository path. Defaults to the MCP server working directory."),

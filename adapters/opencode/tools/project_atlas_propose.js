@@ -22,7 +22,7 @@ function run(command, args, cwd, abort) {
 }
 
 export default tool({
-  description: "Create a project-kb proposal. This tool never applies knowledge changes.",
+  description: "Create a project-atlas proposal. This tool never applies knowledge changes.",
   args: {
     reason: tool.schema.string().describe("Why knowledge should be updated"),
     updates: tool.schema
@@ -37,13 +37,13 @@ export default tool({
   },
   async execute(args, context) {
     const repo = context.worktree || context.directory || process.cwd();
-    const dir = await mkdtemp(path.join(tmpdir(), "project-kb-opencode-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "project-atlas-opencode-"));
     const updatesFile = path.join(dir, "updates.json");
     await writeFile(updatesFile, JSON.stringify({ source_files: args.sourceFiles || [], updates: args.updates }, null, 2), "utf8");
     try {
-      const result = await run("project-kb", ["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", args.reason], repo, context.abort);
+      const result = await run("project-atlas", ["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", args.reason], repo, context.abort);
       return {
-        output: `${result.stdout || result.stderr}\n\nNo apply tool is available. A human must run project-kb apply in a terminal.`,
+        output: `${result.stdout || result.stderr}\n\nNo apply tool is available. A human must run project-atlas apply in a terminal.`,
         metadata: { repo, exitCode: result.exitCode },
       };
     } finally {

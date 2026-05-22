@@ -88,7 +88,7 @@ sys.exit(status)
 }
 
 function makeRepo() {
-  const dir = mkdtempSync(path.join(tmpdir(), "project-kb-test-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "project-atlas-test-"));
   run("git", ["init"], { cwd: dir });
   run("git", ["config", "user.email", "kb@example.test"], { cwd: dir });
   run("git", ["config", "user.name", "KB Test"], { cwd: dir });
@@ -289,13 +289,13 @@ function createMcpSession(cwd) {
 test("help output and parameter errors are short and actionable", () => {
   const help = runProjectKb(["--help"], { cwd: projectRoot });
   assert.equal(help.status, 0, `global help should pass\nstdout:\n${help.stdout}\nstderr:\n${help.stderr}`);
-  assert.match(help.stdout, /Usage: project-kb <command>/);
+  assert.match(help.stdout, /Usage: project-atlas <command>/);
   assert.match(help.stdout, /init/);
   assert.match(help.stdout, /review-summary/);
 
   const contextHelp = runProjectKb(["context", "--help"], { cwd: projectRoot });
   assert.equal(contextHelp.status, 0, `context help should pass\nstdout:\n${contextHelp.stdout}\nstderr:\n${contextHelp.stderr}`);
-  assert.match(contextHelp.stdout, /Usage: project-kb context/);
+  assert.match(contextHelp.stdout, /Usage: project-atlas context/);
   assert.match(contextHelp.stdout, /--repo/);
   assert.match(contextHelp.stdout, /--query/);
   assert.match(contextHelp.stdout, /--source-file/);
@@ -320,12 +320,12 @@ test("help output and parameter errors are short and actionable", () => {
 
   const checkHelp = runProjectKb(["check", "--help"], { cwd: projectRoot });
   assert.equal(checkHelp.status, 0, `check help should pass\nstdout:\n${checkHelp.stdout}\nstderr:\n${checkHelp.stderr}`);
-  assert.match(checkHelp.stdout, /Usage: project-kb check/);
+  assert.match(checkHelp.stdout, /Usage: project-atlas check/);
 
   const unknownCommand = runProjectKb(["unknown"], { cwd: projectRoot });
   assert.notEqual(unknownCommand.status, 0, "unknown command should fail");
   assert.match(unknownCommand.stderr, /Unknown command: unknown/);
-  assert.match(unknownCommand.stderr, /Run `project-kb --help`/);
+  assert.match(unknownCommand.stderr, /Run `project-atlas --help`/);
   assert.doesNotMatch(unknownCommand.stderr, /at runCli/);
 
   const repo = makeRepo();
@@ -334,12 +334,12 @@ test("help output and parameter errors are short and actionable", () => {
     const unknownFlag = runProjectKb(["scan", "--repo", repo, "--bad"], { cwd: repo });
     assert.notEqual(unknownFlag.status, 0, "unknown flag should fail");
     assert.match(unknownFlag.stderr, /Unknown option: --bad/);
-    assert.match(unknownFlag.stderr, /Usage: project-kb scan/);
+    assert.match(unknownFlag.stderr, /Usage: project-atlas scan/);
 
     const missingRequired = runProjectKb(["hash", "--repo", repo], { cwd: repo });
     assert.notEqual(missingRequired.status, 0, "missing required flag should fail");
     assert.match(missingRequired.stderr, /--path is required/);
-    assert.match(missingRequired.stderr, /Usage: project-kb hash/);
+    assert.match(missingRequired.stderr, /Usage: project-atlas hash/);
 
     const invalidFormat = runProjectKb(["context", "--repo", repo, "--format", "xml"], { cwd: repo });
     assert.notEqual(invalidFormat.status, 0, "invalid format should fail");
@@ -358,7 +358,7 @@ test("help output and parameter errors are short and actionable", () => {
 });
 
 test("init requires a git repository and creates the knowledge skeleton", () => {
-  const nonGit = mkdtempSync(path.join(tmpdir(), "project-kb-nongit-"));
+  const nonGit = mkdtempSync(path.join(tmpdir(), "project-atlas-nongit-"));
   try {
     const failed = runProjectKb(["init", "--repo", nonGit], { cwd: nonGit });
     assert.notEqual(failed.status, 0, "init should reject non-git directories");
@@ -385,7 +385,7 @@ test("init requires a git repository and creates the knowledge skeleton", () => 
       assert.ok(existsSync(path.join(repo, rel)), `${rel} should exist`);
     }
     const gitignore = readFileSync(path.join(repo, ".gitignore"), "utf8");
-    assert.match(gitignore, /\.project-kb\//);
+    assert.match(gitignore, /\.project-atlas\//);
     assert.match(gitignore, /knowledge\/\*\*\/\.kbtmp\.\*/);
     const overview = readFileSync(path.join(repo, "knowledge/project/overview.md"), "utf8");
     assert.match(overview, /kb_schema:/);
@@ -553,7 +553,7 @@ test("context supports multiple keywords, source lookup, source type, and trunca
         "  - README.md",
         "source_hashes:",
         "  README.md: sha256:missing",
-        "generated_by: project-kb",
+        "generated_by: project-atlas",
         "review_status: draft",
         "---",
         "# Readme Knowledge",
@@ -572,7 +572,7 @@ test("context supports multiple keywords, source lookup, source type, and trunca
         "  - other.md",
         "source_hashes:",
         "  other.md: sha256:missing",
-        "generated_by: project-kb",
+        "generated_by: project-atlas",
         "review_status: draft",
         "---",
         "# Other Knowledge",
@@ -624,7 +624,7 @@ test("context can filter project memories by metadata", () => {
         "  - README.md",
         "source_hashes:",
         `  README.md: ${readmeHash}`,
-        "generated_by: project-kb",
+        "generated_by: project-atlas",
         "review_status: draft",
         "memory_type: decision",
         "topic: payment retry",
@@ -650,7 +650,7 @@ test("context can filter project memories by metadata", () => {
         "  - README.md",
         "source_hashes:",
         `  README.md: ${readmeHash}`,
-        "generated_by: project-kb",
+        "generated_by: project-atlas",
         "review_status: draft",
         "memory_type: project_fact",
         "topic: order",
@@ -699,7 +699,7 @@ test("stale detects fresh, changed, missing, and metadata-less knowledge docs", 
         "  - README.md",
         "source_hashes:",
         `  README.md: ${sourceHash.stdout.trim()}`,
-        "generated_by: project-kb",
+        "generated_by: project-atlas",
         "review_status: draft",
         "---",
         "# Fresh",
@@ -717,7 +717,7 @@ test("stale detects fresh, changed, missing, and metadata-less knowledge docs", 
         "  - missing.md",
         "source_hashes:",
         "  missing.md: sha256:missing",
-        "generated_by: project-kb",
+        "generated_by: project-atlas",
         "review_status: draft",
         "---",
         "# Missing",
@@ -738,7 +738,7 @@ test("stale detects fresh, changed, missing, and metadata-less knowledge docs", 
     stale = runProjectKb(["stale", "--repo", repo, "--format", "json"], { cwd: repo });
     items = JSON.parse(stale.stdout).items;
     assert.equal(items.find((item) => item.path.endsWith("fresh.md")).status, "stale");
-    assert.match(items.find((item) => item.path.endsWith("fresh.md")).suggestion, /project-kb propose/);
+    assert.match(items.find((item) => item.path.endsWith("fresh.md")).suggestion, /project-atlas propose/);
 
     const markdown = runProjectKb(["stale", "--repo", repo], { cwd: repo });
     assert.equal(markdown.status, 0, `stale markdown should pass\nstdout:\n${markdown.stdout}\nstderr:\n${markdown.stderr}`);
@@ -770,10 +770,10 @@ test("propose creates multi-file evidence and blocks invalid or sensitive update
     );
     const proposed = runProjectKb(["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", "新增订单知识"], { cwd: repo });
     assert.equal(proposed.status, 0, `propose should pass\nstdout:\n${proposed.stdout}\nstderr:\n${proposed.stderr}`);
-    const latest = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals/latest.json"), "utf8"));
+    const latest = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals/latest.json"), "utf8"));
     assert.equal(latest.proposal_status, "proposed");
     assert.match(latest.proposal_hash, /^sha256:/);
-    const proposal = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals", latest.proposal_id, "proposal.json"), "utf8"));
+    const proposal = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals", latest.proposal_id, "proposal.json"), "utf8"));
     assert.equal(proposal.operations.length, 2);
     assert.deepEqual(proposal.source_files, ["README.md"]);
     assert.match(proposal.operations[0].content, /source_hashes:/);
@@ -792,7 +792,7 @@ test("propose creates multi-file evidence and blocks invalid or sensitive update
     for (const field of proposalSchema.required) {
       assert.ok(Object.hasOwn(proposal, field), `proposal should contain ${field}`);
     }
-    const trigger = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals", latest.proposal_id, "trigger-result.json"), "utf8"));
+    const trigger = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals", latest.proposal_id, "trigger-result.json"), "utf8"));
     const triggerSchema = readSchema("trigger-result.schema.json");
     assertRequiredFields(triggerSchema, ["proposal_id", "proposal_hash", "worktree_diff_hash", "needs_knowledge_update", "proposal_status", "updated_at"]);
     for (const field of triggerSchema.required) {
@@ -819,7 +819,7 @@ test("propose creates multi-file evidence and blocks invalid or sensitive update
     writeFileSync(
       localEvidenceSourceFile,
       JSON.stringify({
-        source_files: [".project-kb/proposals/.keep"],
+        source_files: [".project-atlas/proposals/.keep"],
         updates: [{ target: "knowledge/domains/local-evidence.md", content: "# Local Evidence\n" }],
       }),
       "utf8",
@@ -855,9 +855,9 @@ test("propose creates multi-file evidence and blocks invalid or sensitive update
     );
     const sensitive = runProjectKb(["propose", "--repo", repo, "--updates-file", sensitiveFile, "--reason", "敏感内容测试"], { cwd: repo });
     assert.equal(sensitive.status, 0, `sensitive proposal should write blocked evidence\nstdout:\n${sensitive.stdout}\nstderr:\n${sensitive.stderr}`);
-    const blocked = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals/latest.json"), "utf8"));
+    const blocked = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals/latest.json"), "utf8"));
     assert.equal(blocked.proposal_status, "blocked_sensitive");
-    const blockedText = readFileSync(path.join(repo, ".project-kb/proposals", blocked.proposal_id, "proposal.json"), "utf8");
+    const blockedText = readFileSync(path.join(repo, ".project-atlas/proposals", blocked.proposal_id, "proposal.json"), "utf8");
     assert.doesNotMatch(blockedText, /secret-value-123456/);
   } finally {
     cleanup(repo);
@@ -890,8 +890,8 @@ test("propose stores external evidence from file and updates-file, and review-su
       cwd: repo,
     });
     assert.equal(proposed.status, 0, `propose with external evidence should pass\nstdout:\n${proposed.stdout}\nstderr:\n${proposed.stderr}`);
-    const latest = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals/latest.json"), "utf8"));
-    const proposal = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals", latest.proposal_id, "proposal.json"), "utf8"));
+    const latest = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals/latest.json"), "utf8"));
+    const proposal = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals", latest.proposal_id, "proposal.json"), "utf8"));
     assert.equal(proposal.external_evidence.length, 2);
     assert.ok(proposal.external_evidence.some((item) => item.source === "aider-repo-map"));
     assert.ok(proposal.external_evidence.some((item) => item.source === "codebase-memory"));
@@ -924,7 +924,7 @@ test("propose can explicitly inherit existing source metadata", () => {
         "  - README.md",
         "source_hashes:",
         `  README.md: ${readmeHash}`,
-        "generated_by: project-kb",
+        "generated_by: project-atlas",
         "review_status: draft",
         "---",
         "# Existing Order",
@@ -944,15 +944,15 @@ test("propose can explicitly inherit existing source metadata", () => {
 
     const normal = runProjectKb(["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", "默认不继承"], { cwd: repo });
     assert.equal(normal.status, 0, `normal propose should pass\nstdout:\n${normal.stdout}\nstderr:\n${normal.stderr}`);
-    let latest = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals/latest.json"), "utf8"));
-    let proposal = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals", latest.proposal_id, "proposal.json"), "utf8"));
+    let latest = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals/latest.json"), "utf8"));
+    let proposal = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals", latest.proposal_id, "proposal.json"), "utf8"));
     assert.match(proposal.operations[0].content, /  - docs\/new-source.md/);
     assert.doesNotMatch(proposal.operations[0].content, /  - README.md/);
 
     const inherited = runProjectKb(["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", "显式继承", "--inherit-source-metadata"], { cwd: repo });
     assert.equal(inherited.status, 0, `inherited propose should pass\nstdout:\n${inherited.stdout}\nstderr:\n${inherited.stderr}`);
-    latest = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals/latest.json"), "utf8"));
-    proposal = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals", latest.proposal_id, "proposal.json"), "utf8"));
+    latest = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals/latest.json"), "utf8"));
+    proposal = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals", latest.proposal_id, "proposal.json"), "utf8"));
     assert.match(proposal.operations[0].content, /  - README.md/);
     assert.match(proposal.operations[0].content, /  - docs\/new-source.md/);
     assert.match(proposal.operations[0].content, new RegExp(`README\\.md: ${readmeHash.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
@@ -970,10 +970,10 @@ test("remember creates reviewable memory proposals with metadata", () => {
     assert.equal(remembered.status, 0, `remember should pass\nstdout:\n${remembered.stdout}\nstderr:\n${remembered.stderr}`);
     const output = JSON.parse(remembered.stdout);
     assert.equal(output.proposal_status, "proposed");
-    assert.match(output.apply_command, /project-kb apply/);
+    assert.match(output.apply_command, /project-atlas apply/);
     assert.deepEqual(output.target_files, ["knowledge/decisions/source-review.md"]);
 
-    const proposal = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals", output.proposal_id, "proposal.json"), "utf8"));
+    const proposal = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals", output.proposal_id, "proposal.json"), "utf8"));
     const content = proposal.operations[0].content;
     assert.match(content, /memory_type: decision/);
     assert.match(content, /topic: source review/);
@@ -1152,7 +1152,7 @@ test("apply requires tty confirmation, blocks stale worktree, and records applie
       { cwd: repo },
     );
     assert.equal(proposed.status, 0, `propose should pass\nstdout:\n${proposed.stdout}\nstderr:\n${proposed.stderr}`);
-    let latest = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals/latest.json"), "utf8"));
+    let latest = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals/latest.json"), "utf8"));
 
     const nonTty = runProjectKb(["apply", "--repo", repo, "--proposal-id", latest.proposal_id, "--confirm"], { cwd: repo, input: "yes\n" });
     assert.notEqual(nonTty.status, 0, "non-tty apply should fail");
@@ -1179,14 +1179,14 @@ test("apply requires tty confirmation, blocks stale worktree, and records applie
       { cwd: repo },
     );
     assert.equal(reproposed.status, 0, `re-propose should pass\nstdout:\n${reproposed.stdout}\nstderr:\n${reproposed.stderr}`);
-    latest = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals/latest.json"), "utf8"));
+    latest = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals/latest.json"), "utf8"));
     const applied = runProjectKbWithTty(["apply", "--repo", repo, "--proposal-id", latest.proposal_id, "--confirm"], {
       cwd: repo,
       input: "yes\n",
     });
     assert.equal(applied.status, 0, `apply should pass\nstdout:\n${applied.stdout}\nstderr:\n${applied.stderr}`);
     assert.ok(existsSync(path.join(repo, "knowledge/integrations/upstream.md")));
-    const latestAfter = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals/latest.json"), "utf8"));
+    const latestAfter = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals/latest.json"), "utf8"));
     assert.equal(latestAfter.proposal_status, "applied");
     assert.match(latestAfter.applied_hash, /^sha256:/);
   } finally {
@@ -1209,7 +1209,7 @@ test("apply blocks proposals when source evidence changed after creation", () =>
     );
     const proposed = runProjectKb(["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", "来源变更保护"], { cwd: repo });
     assert.equal(proposed.status, 0, `propose should pass\nstdout:\n${proposed.stdout}\nstderr:\n${proposed.stderr}`);
-    const latest = JSON.parse(readFileSync(path.join(repo, ".project-kb/proposals/latest.json"), "utf8"));
+    const latest = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals/latest.json"), "utf8"));
 
     writeFileSync(path.join(repo, "README.md"), "# Demo\n\nProject introduction changed after proposal.\n", "utf8");
     run("git", ["add", "README.md"], { cwd: repo });
@@ -1259,7 +1259,7 @@ test("schema files are valid JSON and expose the versioned public shapes", () =>
   assertRequiredFields(memoryCandidateSchema, ["schema_version", "source_files", "memories"]);
   const sourcePattern = new RegExp(memoryCandidateSchema.properties.source_files.items.pattern);
   assert.equal(sourcePattern.test("README.md"), true);
-  assert.equal(sourcePattern.test(".project-kb/proposals/.keep"), false);
+  assert.equal(sourcePattern.test(".project-atlas/proposals/.keep"), false);
   assert.equal(sourcePattern.test("C:/local-only.md"), false);
   assert.equal(sourcePattern.test("C:local-only.md"), false);
   assert.equal(sourcePattern.test("..\\outside.md"), false);
@@ -1272,17 +1272,17 @@ test("schema files are valid JSON and expose the versioned public shapes", () =>
 test("OpenCode adapter exposes only non-apply tools and proposes terminal apply", () => {
   const toolsDir = path.join(projectRoot, "adapters/opencode/tools");
   const tools = readdirSync(toolsDir).filter((file) => file.endsWith(".js")).sort();
-  assert.deepEqual(tools, ["project_kb_context.js", "project_kb_propose.js", "project_kb_scan.js"]);
+  assert.deepEqual(tools, ["project_atlas_context.js", "project_atlas_propose.js", "project_atlas_scan.js"]);
   assert.ok(!tools.some((file) => file.includes("apply")), "adapter must not expose an apply tool");
 
-  const scanTool = readFileSync(path.join(toolsDir, "project_kb_scan.js"), "utf8");
-  const contextTool = readFileSync(path.join(toolsDir, "project_kb_context.js"), "utf8");
-  const proposeTool = readFileSync(path.join(toolsDir, "project_kb_propose.js"), "utf8");
+  const scanTool = readFileSync(path.join(toolsDir, "project_atlas_scan.js"), "utf8");
+  const contextTool = readFileSync(path.join(toolsDir, "project_atlas_context.js"), "utf8");
+  const proposeTool = readFileSync(path.join(toolsDir, "project_atlas_propose.js"), "utf8");
   assert.match(scanTool, /\["scan", "--repo"/);
   assert.match(contextTool, /\["context", "--repo"/);
   assert.match(proposeTool, /\["propose", "--repo"/);
   assert.match(proposeTool, /No apply tool is available/);
-  assert.match(proposeTool, /human must run project-kb apply in a terminal/i);
+  assert.match(proposeTool, /human must run project-atlas apply in a terminal/i);
   assert.doesNotMatch(`${scanTool}\n${contextTool}\n${proposeTool}`, /\["apply", "--repo"/);
 });
 
@@ -1292,8 +1292,8 @@ test("ecosystem adapter docs expose only safe MCP or CLI entrypoints", () => {
     const readmePath = path.join(projectRoot, "adapters", adapter, "README.md");
     assert.ok(existsSync(readmePath), `${adapter} README should exist`);
     const text = readFileSync(readmePath, "utf8");
-    assert.match(text, /project-kb-mcp|project-kb scan|project-kb context|project-kb propose/);
-    assert.doesNotMatch(text, /project_kb_apply/);
+    assert.match(text, /project-atlas-mcp|project-atlas scan|project-atlas context|project-atlas propose/);
+    assert.doesNotMatch(text, /project_atlas_apply/);
     assert.doesNotMatch(text, /"apply"/);
     assert.doesNotMatch(text, /\["apply"/);
     assert.match(text, /apply .*terminal|terminal .*apply|人工.*终端/i);
@@ -1308,7 +1308,7 @@ test("MCP server exposes only safe tools and can call scan, context, check, prop
     const initialized = await session.request("initialize", {
       protocolVersion: "2025-06-18",
       capabilities: {},
-      clientInfo: { name: "project-kb-test", version: "1.0.0" },
+      clientInfo: { name: "project-atlas-test", version: "1.0.0" },
     });
     assert.ok(initialized.result, `initialize should return a result: ${JSON.stringify(initialized)}`);
     session.notify("notifications/initialized");
@@ -1316,18 +1316,18 @@ test("MCP server exposes only safe tools and can call scan, context, check, prop
     const listed = await session.request("tools/list");
     const toolNames = listed.result.tools.map((tool) => tool.name).sort();
     assert.deepEqual(toolNames, [
-      "project_kb_check",
-      "project_kb_context",
-      "project_kb_propose",
-      "project_kb_remember",
-      "project_kb_review_summary",
-      "project_kb_scan",
-      "project_kb_stale",
+      "project_atlas_check",
+      "project_atlas_context",
+      "project_atlas_propose",
+      "project_atlas_remember",
+      "project_atlas_review_summary",
+      "project_atlas_scan",
+      "project_atlas_stale",
     ]);
     assert.ok(!toolNames.some((name) => name.includes("apply")), "MCP server must not expose apply");
 
     const scan = await session.request("tools/call", {
-      name: "project_kb_scan",
+      name: "project_atlas_scan",
       arguments: { repo, mode: "full" },
     });
     const scanText = scan.result.content[0].text;
@@ -1335,13 +1335,13 @@ test("MCP server exposes only safe tools and can call scan, context, check, prop
     assert.match(scanText, /demo-goods/);
 
     const context = await session.request("tools/call", {
-      name: "project_kb_context",
+      name: "project_atlas_context",
       arguments: { repo, query: "Demo", format: "json", budget: 800 },
     });
     assert.match(context.result.content[0].text, /schema_version/);
 
     const check = await session.request("tools/call", {
-      name: "project_kb_check",
+      name: "project_atlas_check",
       arguments: { repo, format: "json" },
     });
     assert.match(check.result.content[0].text, /"ok": true/);
@@ -1356,11 +1356,11 @@ test("MCP server exposes only safe tools and can call scan, context, check, prop
       "utf8",
     );
     const propose = await session.request("tools/call", {
-      name: "project_kb_propose",
+      name: "project_atlas_propose",
       arguments: { repo, updates_file: updatesFile, reason: "MCP proposal" },
     });
     assert.match(propose.result.content[0].text, /proposal_id:/);
-    assert.match(propose.result.content[0].text, /human must run project-kb apply in a terminal/i);
+    assert.match(propose.result.content[0].text, /human must run project-atlas apply in a terminal/i);
 
     const memoryCandidate = writeMemoryCandidateFile(repo, {
       memories: [
@@ -1376,11 +1376,11 @@ test("MCP server exposes only safe tools and can call scan, context, check, prop
       ],
     });
     const remember = await session.request("tools/call", {
-      name: "project_kb_remember",
+      name: "project_atlas_remember",
       arguments: { repo, candidate_file: memoryCandidate, reason: "MCP memory proposal" },
     });
     assert.match(remember.result.content[0].text, /proposal_id:/);
-    assert.match(remember.result.content[0].text, /human must run project-kb apply in a terminal/i);
+    assert.match(remember.result.content[0].text, /human must run project-atlas apply in a terminal/i);
   } finally {
     await session.close();
     cleanup(repo);
@@ -1400,11 +1400,12 @@ test("P3 governance assets define docs site, CI matrix, and release scripts", ()
     "team-rollout.md",
     "security-faq.md",
     "release-process.md",
+    "publish-now.md",
   ];
   for (const file of siteFiles) {
     const filePath = path.join(projectRoot, "docs/site", file);
     assert.ok(existsSync(filePath), `docs/site/${file} should exist`);
-    assert.match(readFileSync(filePath, "utf8"), /project-kb|Project KB|发布|安全|团队|快速开始/i);
+    assert.match(readFileSync(filePath, "utf8"), /project-atlas|Project Atlas|发布|安全|团队|快速开始/i);
   }
 
   const readme = readFileSync(path.join(projectRoot, "README.md"), "utf8");
@@ -1451,7 +1452,7 @@ test("check reports project knowledge health issues in markdown and json", () =>
         "  - README.md",
         "source_hashes:",
         `  README.md: ${readmeHash}`,
-        "generated_by: project-kb",
+        "generated_by: project-atlas",
         "review_status: draft",
         "memory_type: project_fact",
         "topic: duplicate topic",
@@ -1474,7 +1475,7 @@ test("check reports project knowledge health issues in markdown and json", () =>
         "  - docs/missing.md",
         "source_hashes:",
         "  docs/missing.md: sha256:missing",
-        "generated_by: project-kb",
+        "generated_by: project-atlas",
         "review_status: draft",
         "memory_type: project_fact",
         "topic: duplicate topic",
@@ -1499,7 +1500,7 @@ test("check reports project knowledge health issues in markdown and json", () =>
 
     const markdown = runProjectKb(["check", "--repo", repo], { cwd: repo });
     assert.equal(markdown.status, 0, `check markdown should pass\nstdout:\n${markdown.stdout}\nstderr:\n${markdown.stderr}`);
-    assert.match(markdown.stdout, /# Project KB Check/);
+    assert.match(markdown.stdout, /# Project Atlas Check/);
     assert.match(markdown.stdout, /ok: no/);
     assert.match(markdown.stdout, /missing_metadata/);
     assert.match(markdown.stdout, /duplicate_topic/);
@@ -1525,7 +1526,7 @@ test("review-summary gives reviewer-friendly markdown evidence", () => {
     assert.equal(proposed.status, 0, `propose should pass\nstdout:\n${proposed.stdout}\nstderr:\n${proposed.stderr}`);
     const summary = runProjectKb(["review-summary", "--repo", repo], { cwd: repo });
     assert.equal(summary.status, 0, `review summary should pass\nstdout:\n${summary.stdout}\nstderr:\n${summary.stderr}`);
-    assert.match(summary.stdout, /# Project KB Review Summary/);
+    assert.match(summary.stdout, /# Project Atlas Review Summary/);
     assert.match(summary.stdout, /review summary 测试/);
     assert.match(summary.stdout, /README.md/);
     assert.match(summary.stdout, /knowledge\/domains\/order.md/);
@@ -1534,7 +1535,7 @@ test("review-summary gives reviewer-friendly markdown evidence", () => {
     assert.match(summary.stdout, /## Review Decision/);
     assert.match(summary.stdout, /## Apply Safety/);
     assert.match(summary.stdout, /can_apply: yes/);
-    assert.match(summary.stdout, /project-kb apply/);
+    assert.match(summary.stdout, /project-atlas apply/);
   } finally {
     cleanup(repo);
   }

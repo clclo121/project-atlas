@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/liuliuyun/project-kb-core/schema/memory-candidate.schema.json",
-  "title": "project-kb memory candidate",
+  "$id": "https://github.com/liuliuyun/project-atlas/schema/memory-candidate.schema.json",
+  "title": "project-atlas memory candidate",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "source_files", "memories"],
@@ -15,7 +15,7 @@
       "items": {
         "type": "string",
         "minLength": 1,
-        "pattern": "^(?![A-Za-z]:)(?![\\\\/])(?!(?:\\.git|\\.project-kb|\\.code-review-graph)(?:[\\\\/]|$))(?!\\.\\.(?:[\\\\/]|$))(?!.*[\\\\/]\\.\\.(?:[\\\\/]|$))(?!.*[\\r\\n]).+"
+        "pattern": "^(?![A-Za-z]:)(?![\\\\/])(?!(?:\\.git|\\.project-atlas|\\.code-review-graph)(?:[\\\\/]|$))(?!\\.\\.(?:[\\\\/]|$))(?!.*[\\\\/]\\.\\.(?:[\\\\/]|$))(?!.*[\\r\\n]).+"
       }
     },
     "memories": {
@@ -66,7 +66,7 @@
             "items": {
               "type": "string",
               "minLength": 1,
-              "pattern": "^(?![A-Za-z]:)(?![\\\\/])(?!(?:\\.git|\\.project-kb|\\.code-review-graph)(?:[\\\\/]|$))(?!\\.\\.(?:[\\\\/]|$))(?!.*[\\\\/]\\.\\.(?:[\\\\/]|$))(?!.*[\\r\\n]).+"
+              "pattern": "^(?![A-Za-z]:)(?![\\\\/])(?!(?:\\.git|\\.project-atlas|\\.code-review-graph)(?:[\\\\/]|$))(?!\\.\\.(?:[\\\\/]|$))(?!.*[\\\\/]\\.\\.(?:[\\\\/]|$))(?!.*[\\r\\n]).+"
             }
           }
         }

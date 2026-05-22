@@ -63,7 +63,7 @@ const initTemplates = {
     },
 };
 const globalHelp = [
-    "Usage: project-kb <command> [options]",
+    "Usage: project-atlas <command> [options]",
     "",
     "Git-first project knowledge base governance CLI.",
     "",
@@ -81,25 +81,25 @@ const globalHelp = [
     "  hash             Print a repository file hash",
     "",
     "Examples:",
-    "  project-kb init --repo /path/to/repo",
-    "  project-kb context --repo /path/to/repo --query order --budget 8000",
-    "  project-kb remember --repo /path/to/repo --candidate-file memory.json --reason \"capture project memory\"",
+    "  project-atlas init --repo /path/to/repo",
+    "  project-atlas context --repo /path/to/repo --query order --budget 8000",
+    "  project-atlas remember --repo /path/to/repo --candidate-file memory.json --reason \"capture project memory\"",
     "",
-    "Run `project-kb <command> --help` for command details.",
+    "Run `project-atlas <command> --help` for command details.",
 ].join("\n");
 const commandHelp = {
     init: [
-        "Usage: project-kb init --repo <repo> [--template <generic-service|java-backend|frontend-app>]",
+        "Usage: project-atlas init --repo <repo> [--template <generic-service|java-backend|frontend-app>]",
         "",
         "Options:",
         "  --repo <path>       Git repository path. Defaults to current directory.",
         "  --template <name>   Initial knowledge wording template. Defaults to generic-service.",
         "",
         "Example:",
-        "  project-kb init --repo /path/to/repo --template java-backend",
+        "  project-atlas init --repo /path/to/repo --template java-backend",
     ].join("\n"),
     scan: [
-        "Usage: project-kb scan --repo <repo> --mode <full|changed> [--external-evidence-file <file>]",
+        "Usage: project-atlas scan --repo <repo> --mode <full|changed> [--external-evidence-file <file>]",
         "",
         "Options:",
         "  --repo <path>       Git repository path. Defaults to current directory.",
@@ -107,10 +107,10 @@ const commandHelp = {
         "  --external-evidence-file <file>  JSON file with external repo map or code graph evidence.",
         "",
         "Example:",
-        "  project-kb scan --repo /path/to/repo --mode changed --external-evidence-file evidence.json",
+        "  project-atlas scan --repo /path/to/repo --mode changed --external-evidence-file evidence.json",
     ].join("\n"),
     context: [
-        "Usage: project-kb context --repo <repo> [--query <text>] [--source-file <path>] [--memory-type <decision|experience|project_fact>] [--topic <text>] [--scope <text>] [--budget <chars>] [--format <markdown|json>]",
+        "Usage: project-atlas context --repo <repo> [--query <text>] [--source-file <path>] [--memory-type <decision|experience|project_fact>] [--topic <text>] [--scope <text>] [--budget <chars>] [--format <markdown|json>]",
         "",
         "Options:",
         "  --repo <path>       Git repository path. Defaults to current directory.",
@@ -123,21 +123,21 @@ const commandHelp = {
         "  --format <value>    Output format. Use markdown or json. Defaults to markdown.",
         "",
         "Example:",
-        "  project-kb context --repo /path/to/repo --query order --budget 8000 --format json",
+        "  project-atlas context --repo /path/to/repo --query order --budget 8000 --format json",
     ].join("\n"),
     stale: [
-        "Usage: project-kb stale --repo <repo> [--format <markdown|json>]",
+        "Usage: project-atlas stale --repo <repo> [--format <markdown|json>]",
         "",
         "Options:",
         "  --repo <path>       Git repository path. Defaults to current directory.",
         "  --format <value>    Output format. Use markdown or json. Defaults to markdown.",
         "",
         "Example:",
-        "  project-kb stale --repo /path/to/repo --format json",
+        "  project-atlas stale --repo /path/to/repo --format json",
     ].join("\n"),
     propose: [
-        "Usage: project-kb propose --repo <repo> --updates-file <file> --reason <text>",
-        "Usage: project-kb propose --repo <repo> --target <knowledge/file.md> --content-file <file> --reason <text>",
+        "Usage: project-atlas propose --repo <repo> --updates-file <file> --reason <text>",
+        "Usage: project-atlas propose --repo <repo> --target <knowledge/file.md> --content-file <file> --reason <text>",
         "",
         "Options:",
         "  --repo <path>          Git repository path. Defaults to current directory.",
@@ -149,10 +149,10 @@ const commandHelp = {
         "  --inherit-source-metadata  Merge existing target source_files into the proposal.",
         "",
         "Example:",
-        "  project-kb propose --repo /path/to/repo --updates-file updates.json --external-evidence-file evidence.json --reason \"update project knowledge\"",
+        "  project-atlas propose --repo /path/to/repo --updates-file updates.json --external-evidence-file evidence.json --reason \"update project knowledge\"",
     ].join("\n"),
     remember: [
-        "Usage: project-kb remember --repo <repo> --candidate-file <file> --reason <text> [--format <markdown|json>] [--replace-existing]",
+        "Usage: project-atlas remember --repo <repo> --candidate-file <file> --reason <text> [--format <markdown|json>] [--replace-existing]",
         "",
         "Options:",
         "  --repo <path>             Git repository path. Defaults to current directory.",
@@ -162,58 +162,58 @@ const commandHelp = {
         "  --replace-existing        Allow proposal generation for existing target files.",
         "",
         "Example:",
-        "  project-kb remember --repo /path/to/repo --candidate-file memory.json --reason \"capture review memory\"",
+        "  project-atlas remember --repo /path/to/repo --candidate-file memory.json --reason \"capture review memory\"",
     ].join("\n"),
     check: [
-        "Usage: project-kb check --repo <repo> [--format <markdown|json>]",
+        "Usage: project-atlas check --repo <repo> [--format <markdown|json>]",
         "",
         "Options:",
         "  --repo <path>       Git repository path. Defaults to current directory.",
         "  --format <value>    Output format. Use markdown or json. Defaults to markdown.",
         "",
         "Example:",
-        "  project-kb check --repo /path/to/repo --format json",
+        "  project-atlas check --repo /path/to/repo --format json",
     ].join("\n"),
     apply: [
-        "Usage: project-kb apply --repo <repo> --proposal-id <id> --confirm",
+        "Usage: project-atlas apply --repo <repo> --proposal-id <id> --confirm",
         "",
         "Options:",
         "  --repo <path>          Git repository path. Defaults to current directory.",
-        "  --proposal-id <id>     Proposal id under .project-kb/proposals/.",
+        "  --proposal-id <id>     Proposal id under .project-atlas/proposals/.",
         "  --confirm              Required. Still asks for interactive TTY confirmation.",
         "",
         "Example:",
-        "  project-kb apply --repo /path/to/repo --proposal-id kb-20260521-120000-1 --confirm",
+        "  project-atlas apply --repo /path/to/repo --proposal-id kb-20260521-120000-1 --confirm",
     ].join("\n"),
     "review-summary": [
-        "Usage: project-kb review-summary --repo <repo> [--proposal-id <id>]",
+        "Usage: project-atlas review-summary --repo <repo> [--proposal-id <id>]",
         "",
         "Options:",
         "  --repo <path>          Git repository path. Defaults to current directory.",
         "  --proposal-id <id>     Proposal id. Defaults to latest.json.",
         "",
         "Example:",
-        "  project-kb review-summary --repo /path/to/repo --proposal-id kb-20260521-120000-1",
+        "  project-atlas review-summary --repo /path/to/repo --proposal-id kb-20260521-120000-1",
     ].join("\n"),
     cleanup: [
-        "Usage: project-kb cleanup --repo <repo> [--force]",
+        "Usage: project-atlas cleanup --repo <repo> [--force]",
         "",
         "Options:",
         "  --repo <path>       Git repository path. Defaults to current directory.",
         "  --force             Remove all .kbtmp files instead of only old files.",
         "",
         "Example:",
-        "  project-kb cleanup --repo /path/to/repo --force",
+        "  project-atlas cleanup --repo /path/to/repo --force",
     ].join("\n"),
     hash: [
-        "Usage: project-kb hash --repo <repo> --path <file>",
+        "Usage: project-atlas hash --repo <repo> --path <file>",
         "",
         "Options:",
         "  --repo <path>       Git repository path. Defaults to current directory.",
         "  --path <file>       Repository-relative file path to hash.",
         "",
         "Example:",
-        "  project-kb hash --repo /path/to/repo --path README.md",
+        "  project-atlas hash --repo /path/to/repo --path README.md",
     ].join("\n"),
 };
 export async function runCli(argv) {
@@ -228,7 +228,7 @@ export async function runCli(argv) {
         return;
     }
     if (!commandOptions[parsed.command]) {
-        throw new Error(`Unknown command: ${parsed.command}\n\nRun \`project-kb --help\` to see available commands.`);
+        throw new Error(`Unknown command: ${parsed.command}\n\nRun \`project-atlas --help\` to see available commands.`);
     }
     if (parsed.flags.help || parsed.flags.h) {
         console.log(commandHelp[parsed.command]);
@@ -300,11 +300,11 @@ function cmdInit(flags) {
         "knowledge/integrations",
         "knowledge/quality",
         "knowledge/decisions",
-        ".project-kb/proposals",
+        ".project-atlas/proposals",
     ]) {
         ensureDir(path.join(repo, dir));
     }
-    writeIfMissing(path.join(repo, ".project-kb/proposals/.keep"), "");
+    writeIfMissing(path.join(repo, ".project-atlas/proposals/.keep"), "");
     writeIfMissing(path.join(repo, "knowledge/README.md"), `# Project Knowledge Base\n\nGit-first knowledge assets for humans and AI coding agents.\n\nTemplate: ${template.displayName}\n`);
     writeIfMissing(path.join(repo, "knowledge/index.md"), [
         "# Knowledge Index",
@@ -327,9 +327,9 @@ function cmdInit(flags) {
         schema_version: "1.0",
         max_context_chars: 8000,
         required_files: ["knowledge/README.md", "knowledge/index.md", "knowledge/manifest.json", "knowledge/glossary.md", "knowledge/project/overview.md"],
-        evidence_dir: ".project-kb/proposals",
+        evidence_dir: ".project-atlas/proposals",
     }, null, 2)}\n`);
-    console.log(`Initialized project-kb knowledge base at ${repo}`);
+    console.log(`Initialized project-atlas knowledge base at ${repo}`);
 }
 function cmdScan(flags) {
     const repo = resolveRepo(stringFlag(flags, "repo", "."));
@@ -392,7 +392,7 @@ function cmdPropose(flags) {
     console.log(`proposal_id: ${proposal.proposal_id}`);
     console.log(`proposal_status: ${proposal.proposal_status}`);
     console.log(`proposal_hash: ${proposal.proposal_hash}`);
-    console.log(`apply: project-kb apply --repo ${repo} --proposal-id ${proposal.proposal_id} --confirm`);
+    console.log(`apply: project-atlas apply --repo ${repo} --proposal-id ${proposal.proposal_id} --confirm`);
 }
 function cmdRemember(flags) {
     const repo = resolveRepo(stringFlag(flags, "repo", "."));
@@ -409,7 +409,7 @@ function cmdRemember(flags) {
     const replaceExisting = Boolean(flags["replace-existing"]);
     const inputData = memoryCandidateToUpdateInput(repo, loadMemoryCandidate(repo, candidateFile), replaceExisting);
     const proposal = createProposal(repo, inputData, reason, false);
-    const applyCommand = `project-kb apply --repo ${repo} --proposal-id ${proposal.proposal_id} --confirm`;
+    const applyCommand = `project-atlas apply --repo ${repo} --proposal-id ${proposal.proposal_id} --confirm`;
     if (format === "json") {
         console.log(JSON.stringify({
             schema_version: "1.0",
@@ -483,7 +483,7 @@ function cmdReviewSummary(flags) {
     const repo = resolveRepo(stringFlag(flags, "repo", "."));
     const proposalId = optionalStringFlag(flags, "proposal-id") ?? latestProposalId(repo);
     if (!proposalId) {
-        throw new Error("No proposal found. Run project-kb propose first.");
+        throw new Error("No proposal found. Run project-atlas propose first.");
     }
     const proposalDir = path.join(proposalRoot(repo), proposalId);
     const proposal = readJson(path.join(proposalDir, "proposal.json"));
@@ -499,7 +499,7 @@ function cmdReviewSummary(flags) {
     const hasKnowledgeRisk = hasStale || hasMissingSource || hasMissingMetadata;
     const canApply = proposal.proposal_status === "proposed" && !blocked && !hasKnowledgeRisk;
     const lines = [
-        "# Project KB Review Summary",
+        "# Project Atlas Review Summary",
         "",
         `- proposal_id: ${proposal.proposal_id}`,
         `- proposal_status: ${proposal.proposal_status}`,
@@ -538,7 +538,7 @@ function cmdReviewSummary(flags) {
         "",
         "## Next Step",
         canApply
-            ? `- Run: project-kb apply --repo ${repo} --proposal-id ${proposal.proposal_id} --confirm`
+            ? `- Run: project-atlas apply --repo ${repo} --proposal-id ${proposal.proposal_id} --confirm`
             : nextReviewStep(proposal, hasKnowledgeRisk),
         "",
     ];
@@ -626,7 +626,7 @@ function collectContextItems(repo, filters) {
     return items.sort((a, b) => a.priority - b.priority || a.source.localeCompare(b.source));
 }
 function renderContextMarkdown(items) {
-    const lines = ["# Project KB Context Pack", ""];
+    const lines = ["# Project Atlas Context Pack", ""];
     for (const item of items) {
         lines.push(`## Source: \`${item.source}\``, `Type: ${item.source_type}`);
         if (item.metadata?.memory_type)
@@ -669,7 +669,7 @@ function staleItems(repo) {
                 status: "missing_metadata",
                 source_files: [],
                 details: ["frontmatter or source_files missing"],
-                suggestion: `Add project-kb frontmatter or regenerate with project-kb propose for ${rel}.`,
+                suggestion: `Add project-atlas frontmatter or regenerate with project-atlas propose for ${rel}.`,
             };
         }
         const details = [];
@@ -692,7 +692,7 @@ function staleItems(repo) {
 }
 function renderStaleMarkdown(items) {
     return [
-        "# Project KB Stale Report",
+        "# Project Atlas Stale Report",
         "",
         ...items.map((item) => `- ${item.path}: ${item.status}${item.details.length ? ` (${item.details.join("; ")})` : ""}; Suggestion: ${item.suggestion}`),
         "",
@@ -703,7 +703,7 @@ function checkKnowledge(repo) {
     const manifestPath = path.join(repo, "knowledge/manifest.json");
     let requiredFiles = [];
     if (!existsSync(manifestPath)) {
-        items.push(checkIssue("error", "missing_manifest", "knowledge/manifest.json", "knowledge manifest is missing.", "Run project-kb init or restore knowledge/manifest.json."));
+        items.push(checkIssue("error", "missing_manifest", "knowledge/manifest.json", "knowledge manifest is missing.", "Run project-atlas init or restore knowledge/manifest.json."));
     }
     else {
         try {
@@ -740,7 +740,7 @@ function checkKnowledge(repo) {
         }
         if (!metadata || metadata.source_files.length === 0) {
             if (!isScaffoldKnowledgeFile(rel)) {
-                items.push(checkIssue("error", "missing_metadata", rel, "frontmatter or source_files missing.", "Regenerate this file with project-kb remember or project-kb propose."));
+                items.push(checkIssue("error", "missing_metadata", rel, "frontmatter or source_files missing.", "Regenerate this file with project-atlas remember or project-atlas propose."));
             }
             continue;
         }
@@ -751,7 +751,7 @@ function checkKnowledge(repo) {
                 items.push(checkIssue("error", "missing_source", rel, `source file is missing: ${source}`, "Restore the source file or refresh this memory with current evidence."));
             }
             else if (!expected || expected !== current) {
-                items.push(checkIssue("error", "stale_source", rel, `source hash changed: ${source}`, "Refresh this memory with project-kb remember or project-kb propose."));
+                items.push(checkIssue("error", "stale_source", rel, `source hash changed: ${source}`, "Refresh this memory with project-atlas remember or project-atlas propose."));
             }
         }
         if (metadata.topic) {
@@ -778,7 +778,7 @@ function checkKnowledge(repo) {
     return { schema_version: "1.0", repo, ok, items };
 }
 function renderCheckMarkdown(result) {
-    const lines = ["# Project KB Check", "", `- ok: ${result.ok ? "yes" : "no"}`, `- issues: ${result.items.length}`, ""];
+    const lines = ["# Project Atlas Check", "", `- ok: ${result.ok ? "yes" : "no"}`, `- issues: ${result.items.length}`, ""];
     if (!result.items.length) {
         lines.push("## Issues", "- none", "");
         return lines.join("\n");
@@ -834,7 +834,7 @@ function createProposal(repo, inputData, reason, inheritSourceMetadata = false) 
             const content = ensureKnowledgeFrontmatter(update.content, {
                 source_files: sourceFiles,
                 source_hashes: sourceHashes,
-                generated_by: "project-kb",
+                generated_by: "project-atlas",
                 review_status: "draft",
             });
             return { type: "replace_file", path: target, content, target_current_hash: repoFileHash(repo, target) };
@@ -977,7 +977,7 @@ function buildMemoryContent(memory, sourceFiles, sourceHashes) {
     return `${buildFrontmatter({
         source_files: sourceFiles,
         source_hashes: sourceHashes,
-        generated_by: "project-kb",
+        generated_by: "project-atlas",
         review_status: "draft",
         memory_type: memory.memory_type,
         topic: memory.topic,
@@ -1168,9 +1168,9 @@ function staleSuggestion(pathValue, status) {
         return `Check missing source file before refreshing ${pathValue}.`;
     }
     if (status === "missing_metadata") {
-        return `Add project-kb frontmatter or regenerate with project-kb propose for ${pathValue}.`;
+        return `Add project-atlas frontmatter or regenerate with project-atlas propose for ${pathValue}.`;
     }
-    return `Run project-kb propose with refreshed content for ${pathValue}.`;
+    return `Run project-atlas propose with refreshed content for ${pathValue}.`;
 }
 function isScaffoldKnowledgeFile(pathValue) {
     return (pathValue === "knowledge/README.md" ||
@@ -1288,7 +1288,7 @@ function validateRepoRelativePath(value, label) {
         throw new Error(`${label} must stay inside the repository.`);
     }
     const root = normalized.split("/")[0];
-    if (root === ".git" || root === ".project-kb" || root === ".code-review-graph") {
+    if (root === ".git" || root === ".project-atlas" || root === ".code-review-graph") {
         throw new Error(`${label} cannot reference local evidence or Git metadata paths.`);
     }
     return normalized;
@@ -1389,7 +1389,7 @@ function includesIgnoreCase(value, query) {
 function usageError(command, message) {
     const help = commandHelp[command];
     if (!help) {
-        return new Error(`${message}\n\nRun \`project-kb --help\` to see available commands.`);
+        return new Error(`${message}\n\nRun \`project-atlas --help\` to see available commands.`);
     }
     return new Error(`${message}\n\n${help}`);
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/liuliuyun/project-kb-core/schema/trigger-result.schema.json",
-  "title": "project-kb trigger result",
+  "$id": "https://github.com/liuliuyun/project-atlas/schema/trigger-result.schema.json",
+  "title": "project-atlas trigger result",
   "type": "object",
   "additionalProperties": false,
   "required": [

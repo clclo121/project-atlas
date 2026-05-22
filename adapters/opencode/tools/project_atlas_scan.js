@@ -19,13 +19,13 @@ function run(command, args, cwd, abort) {
 }
 
 export default tool({
-  description: "Scan project knowledge candidates with project-kb. This tool never writes knowledge files.",
+  description: "Scan project knowledge candidates with project-atlas. This tool never writes knowledge files.",
   args: {
     mode: tool.schema.string().optional().describe("full or changed"),
   },
   async execute(args, context) {
     const repo = context.worktree || context.directory || process.cwd();
-    const result = await run("project-kb", ["scan", "--repo", repo, "--mode", args.mode || "full"], repo, context.abort);
+    const result = await run("project-atlas", ["scan", "--repo", repo, "--mode", args.mode || "full"], repo, context.abort);
     return {
       output: result.stdout || result.stderr,
       metadata: { repo, exitCode: result.exitCode },

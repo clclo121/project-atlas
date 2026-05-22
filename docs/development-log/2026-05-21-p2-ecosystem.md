@@ -1,4 +1,4 @@
-# 2026-05-21 project-kb-core P2 生态能力记录
+# 2026-05-21 project-atlas P2 生态能力记录
 
 ## 本轮目标
 
@@ -30,18 +30,18 @@
 
 4. 实现 MCP server。
    - 新增 `src/mcp.ts`。
-   - 新增 package bin `project-kb-mcp`，指向 `dist/mcp.js`。
+   - 新增 package bin `project-atlas-mcp`，指向 `dist/mcp.js`。
    - 使用 `@modelcontextprotocol/server` 的 `McpServer` 和 `StdioServerTransport`。
    - MCP 工具内部复用 CLI 输出。
-   - 只暴露 `project_kb_scan`、`project_kb_context`、`project_kb_stale`、`project_kb_propose`、`project_kb_review_summary`。
-   - `project_kb_propose` 输出中明确提示人工回到终端执行 apply。
+   - 只暴露 `project_atlas_scan`、`project_atlas_context`、`project_atlas_stale`、`project_atlas_propose`、`project_atlas_review_summary`。
+   - `project_atlas_propose` 输出中明确提示人工回到终端执行 apply。
    - SDK 当前版本运行时需要 `@cfworker/json-schema`，已作为运行依赖加入。
 
 5. 补 adapter 文档。
    - 新增 `adapters/claude-code/README.md`。
    - 新增 `adapters/cursor/README.md`。
    - 新增 `adapters/continue/README.md`。
-   - 三个 adapter 都只依赖 `project-kb-mcp` 或安全 CLI 能力。
+   - 三个 adapter 都只依赖 `project-atlas-mcp` 或安全 CLI 能力。
    - 三个 adapter 都不提供模型可调用的 apply 能力。
 
 6. 补公开文档和 schema。

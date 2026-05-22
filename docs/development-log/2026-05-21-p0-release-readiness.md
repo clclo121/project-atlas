@@ -1,4 +1,4 @@
-# 2026-05-21 project-kb-core P0 发布准备记录
+# 2026-05-21 project-atlas P0 发布准备记录
 
 ## 本轮目标
 
@@ -19,7 +19,7 @@
    - 新增 OpenCode adapter 安全烟测，确认没有 apply tool。
 
 3. 实现 CLI 帮助和错误提示。
-   - 增加 `project-kb --help`、`project-kb help` 和 `project-kb <command> --help`。
+   - 增加 `project-atlas --help`、`project-atlas help` 和 `project-atlas <command> --help`。
    - 增加命令参数白名单，未知参数直接提示对应 usage。
    - `context` 和 `stale` 对 `--format` 做显式校验。
    - `context` 对 `--budget` 和 `--max-context-chars` 做正整数校验。

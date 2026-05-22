@@ -21,7 +21,7 @@
 - `remember` 拒绝仓库外 source path。
 - `remember --replace-existing false` 报错。
 - `remember` 拒绝重复 target。
-- `propose` 拒绝 `.project-kb/` 这类本地证据目录作为 source。
+- `propose` 拒绝 `.project-atlas/` 这类本地证据目录作为 source。
 - `remember` 拒绝 `C:/...` 这类盘符路径作为 source。
 - memory candidate schema 的 source path 正则同步拒绝本地证据目录、盘符路径和反斜杠形式的上级目录。
 
@@ -30,7 +30,7 @@
 ## 实现调整
 
 - 新增 repo-relative path 校验，拒绝绝对路径、`..`、空值、换行和 NUL。
-- repo-relative path 校验继续拒绝 `.git/`、`.project-kb/`、`.code-review-graph/`，避免共享知识依赖本地证据或 Git 内部文件。
+- repo-relative path 校验继续拒绝 `.git/`、`.project-atlas/`、`.code-review-graph/`，避免共享知识依赖本地证据或 Git 内部文件。
 - repo-relative path 校验拒绝 Windows 盘符路径，避免把 `C:/...` 当成普通相对路径。
 - `updates-file.source_files` 和 memory candidate `source_files` 都走同一套校验。
 - 从旧知识文档继承 source metadata 时，也会重新校验 source path。

@@ -2,7 +2,7 @@
 
 ## 背景
 
-本轮目标是给 Project KB 增加项目级 Git 记忆能力。记忆仍然落在 `knowledge/`，通过 proposal 审查进入仓库，不新增个人长期记忆库，不读取聊天记录，也不允许 agent 或 MCP 自动 apply。
+本轮目标是给 Project Atlas 增加项目级 Git 记忆能力。记忆仍然落在 `knowledge/`，通过 proposal 审查进入仓库，不新增个人长期记忆库，不读取聊天记录，也不允许 agent 或 MCP 自动 apply。
 
 实施前工作区已有未提交的审查修复。本轮按既有改动作为基线继续开发，没有回滚这些改动。
 
@@ -19,7 +19,7 @@
 - 非法 target、非法 confidence 和缺少关键字段会报短错误。
 - `check` 能识别健康知识库、缺 manifest、缺 required file、缺 frontmatter、source stale、missing source、坏相对链接、重复 topic 和 JSON 输出结构。
 - `context` 能按 `memory_type`、`topic`、`scope` 过滤，并在 JSON items 中返回 metadata。
-- MCP 工具列表新增 `project_kb_remember` 和 `project_kb_check`，并确认没有 apply 工具。
+- MCP 工具列表新增 `project_atlas_remember` 和 `project_atlas_check`，并确认没有 apply 工具。
 
 第一次运行测试时，新增测试按预期失败，原因是 CLI、schema 和 MCP 工具还没有实现。随后完成实现并再次运行测试，全部通过。
 
@@ -28,8 +28,8 @@
 新增命令：
 
 ```bash
-project-kb remember --repo <repo> --candidate-file <file> --reason <text> [--format markdown|json] [--replace-existing]
-project-kb check --repo <repo> [--format markdown|json]
+project-atlas remember --repo <repo> --candidate-file <file> --reason <text> [--format markdown|json] [--replace-existing]
+project-atlas check --repo <repo> [--format markdown|json]
 ```
 
 `remember` 读取结构化候选 JSON。候选文件包含：
@@ -69,7 +69,7 @@ project-kb check --repo <repo> [--format markdown|json]
 `context` 新增过滤参数：
 
 ```bash
-project-kb context --repo <repo> --memory-type decision --topic payment --scope backend --format json
+project-atlas context --repo <repo> --memory-type decision --topic payment --scope backend --format json
 ```
 
 只要设置记忆过滤参数，读取范围会收敛到 `knowledge/**/*.md`。JSON 输出的 items 增加 `metadata`，包含 `memory_type`、`topic`、`scope`、`confidence`、`owner` 和 `related_docs`。
@@ -90,10 +90,10 @@ schema 版本继续固定为 `1.0`。
 
 MCP 新增两个安全工具：
 
-- `project_kb_remember`
-- `project_kb_check`
+- `project_atlas_remember`
+- `project_atlas_check`
 
-MCP 工具仍然不暴露 apply。`project_kb_remember` 返回内容会提醒用户回到终端执行人工 apply。
+MCP 工具仍然不暴露 apply。`project_atlas_remember` 返回内容会提醒用户回到终端执行人工 apply。
 
 Claude Code、Cursor 和 Continue 的 adapter 文档已同步工具列表。OpenCode adapter 仍然只保留原有 scan、context 和 propose 示例，不新增 apply。
 

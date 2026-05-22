@@ -1,10 +1,10 @@
 # OpenCode Adapter Example
 
-This adapter shows how OpenCode can call `project-kb` without making OpenCode the core product.
+This adapter shows how OpenCode can call `project-atlas` without making OpenCode the core product.
 
 ## Install
 
-1. Install and build `project-kb`.
+1. Install and build `project-atlas`.
 
 ```bash
 npm install
@@ -25,13 +25,13 @@ adapters/opencode/skills
 The tools only call read, scan, and proposal commands. There is no apply tool. Real writes must be done by a human in a terminal:
 
 ```bash
-project-kb apply --repo <repo> --proposal-id <id> --confirm
+project-atlas apply --repo <repo> --proposal-id <id> --confirm
 ```
 
 ## Manual Smoke Test
 
-- Run `project_kb_scan` in a temporary Git project and confirm it returns scan JSON.
-- Run `project_kb_context` with a small query and confirm it returns source paths.
-- Run `project_kb_propose` with one target under `knowledge/` and confirm it creates proposal evidence.
-- Confirm no `project_kb_apply` tool exists.
-- Confirm the proposal output tells the user to run `project-kb apply` in a terminal.
+- Run `project_atlas_scan` in a temporary Git project and confirm it returns scan JSON.
+- Run `project_atlas_context` with a small query and confirm it returns source paths.
+- Run `project_atlas_propose` with one target under `knowledge/` and confirm it creates proposal evidence.
+- Confirm no `project_atlas_apply` tool exists.
+- Confirm the proposal output tells the user to run `project-atlas apply` in a terminal.

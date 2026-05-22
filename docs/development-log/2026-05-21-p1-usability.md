@@ -1,4 +1,4 @@
-# 2026-05-21 project-kb-core P1 可用性增强记录
+# 2026-05-21 project-atlas P1 可用性增强记录
 
 ## 本轮目标
 

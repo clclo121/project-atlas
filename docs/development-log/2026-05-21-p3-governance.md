@@ -1,4 +1,4 @@
-# 2026-05-21 project-kb-core P3 治理能力记录
+# 2026-05-21 project-atlas P3 治理能力记录
 
 ## 本轮目标
 

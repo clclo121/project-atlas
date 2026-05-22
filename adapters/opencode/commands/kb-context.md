@@ -1,5 +1,5 @@
 ---
-description: Read project-kb context pack
+description: Read project-atlas context pack
 ---
 
-Call `project_kb_context` with the current task topic. Use the returned source paths when citing project knowledge.
+Call `project_atlas_context` with the current task topic. Use the returned source paths when citing project knowledge.

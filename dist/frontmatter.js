@@ -71,7 +71,7 @@ export function buildFrontmatter(metadata) {
     for (const [source, hash] of Object.entries(metadata.source_hashes)) {
         lines.push(`  ${source}: ${hash}`);
     }
-    lines.push(`generated_by: ${metadata.generated_by ?? "project-kb"}`);
+    lines.push(`generated_by: ${metadata.generated_by ?? "project-atlas"}`);
     lines.push(`review_status: ${metadata.review_status ?? "draft"}`);
     if (metadata.memory_type)
         lines.push(`memory_type: ${metadata.memory_type}`);

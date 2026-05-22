@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/liuliuyun/project-kb-core/schema/manifest.schema.json",
-  "title": "project-kb manifest",
+  "$id": "https://github.com/liuliuyun/project-atlas/schema/manifest.schema.json",
+  "title": "project-atlas manifest",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "max_context_chars", "required_files", "evidence_dir"],

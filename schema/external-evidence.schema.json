@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/liuliuyun/project-kb-core/schema/external-evidence.schema.json",
-  "title": "project-kb external evidence",
+  "$id": "https://github.com/liuliuyun/project-atlas/schema/external-evidence.schema.json",
+  "title": "project-atlas external evidence",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "external_evidence"],

@@ -19,7 +19,7 @@ function run(command, args, cwd, abort) {
 }
 
 export default tool({
-  description: "Read a compact project-kb context pack. This tool never writes knowledge files.",
+  description: "Read a compact project-atlas context pack. This tool never writes knowledge files.",
   args: {
     query: tool.schema.string().optional().describe("Optional topic or keyword"),
     budget: tool.schema.number().optional().describe("Maximum context characters"),
@@ -28,7 +28,7 @@ export default tool({
     const repo = context.worktree || context.directory || process.cwd();
     const commandArgs = ["context", "--repo", repo, "--budget", String(args.budget || 8000)];
     if (args.query) commandArgs.push("--query", args.query);
-    const result = await run("project-kb", commandArgs, repo, context.abort);
+    const result = await run("project-atlas", commandArgs, repo, context.abort);
     return {
       output: result.stdout || result.stderr,
       metadata: { repo, exitCode: result.exitCode },

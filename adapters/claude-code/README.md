@@ -1,11 +1,11 @@
 # Claude Code Adapter
 
-Claude Code can connect to `project-kb-mcp` as a local stdio MCP server.
+Claude Code can connect to `project-atlas-mcp` as a local stdio MCP server.
 
-Install `project-kb-core` first, then add the server from a project directory:
+Install `project-atlas` first, then add the server from a project directory:
 
 ```bash
-claude mcp add --transport stdio project-kb -- project-kb-mcp
+claude mcp add --transport stdio project-atlas -- project-atlas-mcp
 ```
 
 For a team-shared project config, create `.mcp.json`:
@@ -13,9 +13,9 @@ For a team-shared project config, create `.mcp.json`:
 ```json
 {
   "mcpServers": {
-    "project-kb": {
+    "project-atlas": {
       "type": "stdio",
-      "command": "project-kb-mcp",
+      "command": "project-atlas-mcp",
       "args": []
     }
   }

@@ -17,7 +17,7 @@ export function resolveRepo(input = "."): string {
   }
   const root = runGit(input, ["rev-parse", "--show-toplevel"]);
   if (!root) {
-    throw new Error("project-kb currently supports Git repositories only.");
+    throw new Error("project-atlas currently supports Git repositories only.");
   }
   return root;
 }
@@ -74,7 +74,7 @@ export function walkFiles(repo: string, dirRel = "."): string[] {
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     const rel = dirRel === "." ? entry.name : path.posix.join(toPosix(dirRel), entry.name);
     if (entry.isDirectory()) {
-      if ([".git", ".project-kb", ".opencode", ".code-review-graph", "node_modules", "dist", "target"].includes(entry.name)) {
+      if ([".git", ".project-atlas", ".opencode", ".code-review-graph", "node_modules", "dist", "target"].includes(entry.name)) {
         continue;
       }
       output.push(...walkFiles(repo, rel));
@@ -93,7 +93,7 @@ export function changedFiles(repo: string): string[] {
     ["ls-files", "--others", "--exclude-standard"],
   ]) {
     for (const line of runGit(repo, args).split(/\r?\n/)) {
-      if (line && !line.startsWith(".project-kb/")) {
+      if (line && !line.startsWith(".project-atlas/")) {
         values.add(line);
       }
     }
@@ -106,7 +106,7 @@ export function worktreeHash(repo: string): string {
   parts.push(runGit(repo, ["diff", "--binary"]));
   parts.push(runGit(repo, ["diff", "--cached", "--binary"]));
   for (const rel of runGit(repo, ["ls-files", "--others", "--exclude-standard"]).split(/\r?\n/).filter(Boolean).sort()) {
-    if (rel.startsWith(".project-kb/")) {
+    if (rel.startsWith(".project-atlas/")) {
       continue;
     }
     const abs = path.join(repo, rel);
@@ -121,17 +121,17 @@ export function worktreeHash(repo: string): string {
 
 export function updateGitignore(repo: string): void {
   const block = [
-    "# >>> project-kb >>>",
-    ".project-kb/",
+    "# >>> project-atlas >>>",
+    ".project-atlas/",
     "knowledge/**/.kbtmp.*",
     "knowledge/**/*.kbtmp.*",
-    "# <<< project-kb <<<",
+    "# <<< project-atlas <<<",
     "",
   ].join("\n");
   const filePath = path.join(repo, ".gitignore");
   const current = existsSync(filePath) ? readFileSync(filePath, "utf8") : "";
-  const start = "# >>> project-kb >>>";
-  const end = "# <<< project-kb <<<";
+  const start = "# >>> project-atlas >>>";
+  const end = "# <<< project-atlas <<<";
   if (current.includes(start) && current.includes(end)) {
     const next = current.replace(new RegExp(`${escapeRegExp(start)}[\\s\\S]*?${escapeRegExp(end)}\\n?`, "m"), block);
     writeFileSync(filePath, next, "utf8");
@@ -141,18 +141,18 @@ export function updateGitignore(repo: string): void {
 }
 
 export function ensureEvidenceIgnored(repo: string): void {
-  const ignored = runGit(repo, ["check-ignore", ".project-kb/proposals/.keep"]);
+  const ignored = runGit(repo, ["check-ignore", ".project-atlas/proposals/.keep"]);
   if (!ignored) {
-    throw new Error(".project-kb/proposals/.keep is not ignored by Git. Run project-kb init first.");
+    throw new Error(".project-atlas/proposals/.keep is not ignored by Git. Run project-atlas init first.");
   }
-  const tracked = runGit(repo, ["ls-files", ".project-kb"]);
+  const tracked = runGit(repo, ["ls-files", ".project-atlas"]);
   if (tracked) {
-    throw new Error(`.project-kb is tracked by Git and must be removed from the index first:\n${tracked}`);
+    throw new Error(`.project-atlas is tracked by Git and must be removed from the index first:\n${tracked}`);
   }
 }
 
 export function proposalRoot(repo: string): string {
-  return path.join(repo, ".project-kb", "proposals");
+  return path.join(repo, ".project-atlas", "proposals");
 }
 
 export function validateKnowledgeTarget(target: string): string {

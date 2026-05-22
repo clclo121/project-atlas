@@ -3,6 +3,6 @@ dist/
 node_modules/
 .idea/
 *.tgz
-.project-kb/
+.project-atlas/
 *.log
 .DS_Store

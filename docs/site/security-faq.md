@@ -2,7 +2,7 @@
 
 ## Agent 能直接写知识库吗
 
-不能。Project KB 的 agent adapter 和 MCP server 都不提供 apply 工具。
+不能。Project Atlas 的 agent adapter 和 MCP server 都不提供 apply 工具。
 
 Agent 可以：
 
@@ -22,7 +22,7 @@ Agent 不能：
 
 ## 为什么 apply 必须在终端执行
 
-`apply` 会真实写入知识文档。Project KB 要求人在终端 TTY 中确认，避免模型在没有人工检查时直接改知识库。
+`apply` 会真实写入知识文档。Project Atlas 要求人在终端 TTY 中确认，避免模型在没有人工检查时直接改知识库。
 
 ## 敏感内容怎么处理
 
@@ -38,9 +38,9 @@ proposal 命中敏感规则时，状态会变成 `blocked_sensitive`，并且不
 
 ## MCP 有写入风险吗
 
-`project-kb-mcp` 是本地 stdio MCP server，只暴露安全工具。它不暴露 apply。
+`project-atlas-mcp` 是本地 stdio MCP server，只暴露安全工具。它不暴露 apply。
 
-如果某个 MCP 客户端支持自定义命令，团队不要把 `project-kb apply` 配成模型可调用工具。
+如果某个 MCP 客户端支持自定义命令，团队不要把 `project-atlas apply` 配成模型可调用工具。
 
 ## 项目记忆会不会变成个人记忆
 
@@ -48,8 +48,8 @@ proposal 命中敏感规则时，状态会变成 `blocked_sensitive`，并且不
 
 项目记忆进入 `knowledge/` 后就是团队共享内容，必须接受 Git review。需要替换已有记忆时，命令要显式传 `--replace-existing`。
 
-## `.project-kb/` 要提交吗
+## `.project-atlas/` 要提交吗
 
-默认不要提交。`.project-kb/proposals/` 是本地证据目录，通常用于当前 review 和人工确认。
+默认不要提交。`.project-atlas/proposals/` 是本地证据目录，通常用于当前 review 和人工确认。
 
 稳定知识应该落在 `knowledge/**`，并通过 Git 审查。

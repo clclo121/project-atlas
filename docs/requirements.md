@@ -1,10 +1,10 @@
-# project-kb-core 需求文档
+# project-atlas 需求文档
 
 ## 1. 产品定位
 
-`project-kb-core` 是面向 AI Coding Agent 和人类研发团队的项目知识库治理 CLI。
+`project-atlas` 是面向 AI Coding Agent 和人类研发团队的项目知识库治理 CLI。
 
-它不定位为某一个 Agent 的插件。OpenCode 只是第一套适配示例。核心产品是 `project-kb` CLI、知识库目录规范、证据协议和人工确认写入流程。
+它不定位为某一个 Agent 的插件。OpenCode 只是第一套适配示例。核心产品是 `project-atlas` CLI、知识库目录规范、证据协议和人工确认写入流程。
 
 一句话定位：
 
@@ -16,31 +16,31 @@
 
 AI 每次进入项目都重新搜索 README、源码、配置和历史文档，浪费 token，也容易漏掉关键上下文。
 
-`project-kb` 通过 `context` 生成紧凑上下文包，让 AI 先读经过治理的项目知识，再按需要查源码。
+`project-atlas` 通过 `context` 生成紧凑上下文包，让 AI 先读经过治理的项目知识，再按需要查源码。
 
 ### 2.2 跨会话上下文丢失
 
 AI 会话结束后，需求背景、业务规则、接口边界和排障经验容易散落在聊天记录里。
 
-`project-kb` 把长期有效知识沉淀到 `knowledge/`，跟随 Git 一起保存和评审。
+`project-atlas` 把长期有效知识沉淀到 `knowledge/`，跟随 Git 一起保存和评审。
 
 ### 2.3 自动生成文档不可信
 
 自动文档如果没有来源文件、hash、proposal 和审查结果，团队很难判断它是不是编造出来的。
 
-`project-kb` 要求知识文档包含 frontmatter，记录 `source_files`、`source_hashes`、`generated_by` 和 `review_status`。
+`project-atlas` 要求知识文档包含 frontmatter，记录 `source_files`、`source_hashes`、`generated_by` 和 `review_status`。
 
 ### 2.4 自动写入存在风险
 
 如果模型可以直接写入知识库，就可能把错误结论、敏感配置或未确认内容写进仓库。
 
-`project-kb apply` 必须在终端 TTY 下人工确认。Agent 适配层不提供 apply tool。
+`project-atlas apply` 必须在终端 TTY 下人工确认。Agent 适配层不提供 apply tool。
 
 ### 2.5 知识库缺少审查流程
 
 团队需要知道本轮为什么要更新知识库、改了哪些文件、引用了哪些来源、是否命中敏感阻断、是否存在过期知识。
 
-`project-kb review-summary` 生成面向 reviewer 的 Markdown 摘要，减少人工读 JSON 的成本。
+`project-atlas review-summary` 生成面向 reviewer 的 Markdown 摘要，减少人工读 JSON 的成本。
 
 ## 3. 目标用户
 
@@ -56,17 +56,17 @@ AI 会话结束后，需求背景、业务规则、接口边界和排障经验�
 用户在 Git 项目中执行：
 
 ```bash
-project-kb init --repo <repo>
+project-atlas init --repo <repo>
 ```
 
-系统创建 `knowledge/` 骨架和 `.project-kb/proposals/` 本地证据目录，并把 `.project-kb/` 写入 `.gitignore`。
+系统创建 `knowledge/` 骨架和 `.project-atlas/proposals/` 本地证据目录，并把 `.project-atlas/` 写入 `.gitignore`。
 
 ### 4.2 AI 开始任务前读取上下文
 
 用户或 Agent 执行：
 
 ```bash
-project-kb context --repo <repo> --query <topic> --budget 8000
+project-atlas context --repo <repo> --query <topic> --budget 8000
 ```
 
 系统按进行中规格、归档规格、知识库的顺序输出上下文包，并保留来源路径。
@@ -76,8 +76,8 @@ project-kb context --repo <repo> --query <topic> --budget 8000
 用户或 Agent 执行：
 
 ```bash
-project-kb scan --repo <repo> --mode changed
-project-kb stale --repo <repo>
+project-atlas scan --repo <repo> --mode changed
+project-atlas stale --repo <repo>
 ```
 
 系统输出本轮变更文件、候选知识目标、敏感配置摘要和过期知识状态。
@@ -87,7 +87,7 @@ project-kb stale --repo <repo>
 用户或 Agent 执行：
 
 ```bash
-project-kb propose --repo <repo> --updates-file updates.json --reason "新增订单规则"
+project-atlas propose --repo <repo> --updates-file updates.json --reason "新增订单规则"
 ```
 
 系统只生成 proposal 证据，不直接写 `knowledge/**`。
@@ -97,7 +97,7 @@ project-kb propose --repo <repo> --updates-file updates.json --reason "新增订
 用户在终端执行：
 
 ```bash
-project-kb apply --repo <repo> --proposal-id <id> --confirm
+project-atlas apply --repo <repo> --proposal-id <id> --confirm
 ```
 
 系统要求 TTY 确认，并在确认后再次校验 worktree hash 和目标文件 hash。
@@ -107,7 +107,7 @@ project-kb apply --repo <repo> --proposal-id <id> --confirm
 用户执行：
 
 ```bash
-project-kb review-summary --repo <repo> --proposal-id <id>
+project-atlas review-summary --repo <repo> --proposal-id <id>
 ```
 
 系统输出本次 proposal 的人类可读摘要。
@@ -120,8 +120,8 @@ project-kb review-summary --repo <repo> --proposal-id <id>
 - 必须创建 `knowledge/` 标准目录。
 - 必须创建 `knowledge/project/overview.md`。
 - 必须创建 `knowledge/manifest.json`。
-- 必须创建 `.project-kb/proposals/`。
-- 必须把 `.project-kb/` 和 `knowledge/**/*.kbtmp.*` 写入 `.gitignore`。
+- 必须创建 `.project-atlas/proposals/`。
+- 必须把 `.project-atlas/` 和 `knowledge/**/*.kbtmp.*` 写入 `.gitignore`。
 - 已存在文件不得覆盖。
 
 ### 5.2 `scan`
@@ -188,7 +188,7 @@ project-kb review-summary --repo <repo> --proposal-id <id>
 
 ### 5.9 MCP 和其他 adapter
 
-- `project-kb-mcp` 只提供本地 stdio MCP server。
+- `project-atlas-mcp` 只提供本地 stdio MCP server。
 - MCP 只能暴露 `scan`、`context`、`stale`、`propose`、`review-summary`。
 - MCP 不允许暴露 apply tool。
 - Claude Code、Cursor、Continue adapter 只作为示例说明。
@@ -209,7 +209,7 @@ project-kb review-summary --repo <repo> --proposal-id <id>
 
 - 敏感配置不得输出原文值。
 - 模型工具不得直接写 `knowledge/**`。
-- `.project-kb/` 默认不提交 Git。
+- `.project-atlas/` 默认不提交 Git。
 - proposal target 必须做路径边界校验。
 - apply 必须由人工在 TTY 确认。
 - 写入前后必须做 hash 校验。

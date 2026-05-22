@@ -1,4 +1,4 @@
-# project-kb-core 剩余待开发项
+# project-atlas 剩余待开发项
 
 本文记录第一版实现后的剩余工作。优先级按开源可用性和团队落地价值排序。
 
@@ -18,15 +18,15 @@
 
 完成内容：
 
-- 增加 `project-kb --help`。
+- 增加 `project-atlas --help`。
 - 增加每个子命令的 `--help`。
 - 给参数错误补使用示例。
 - 错误信息保持短句，避免堆栈直接暴露给普通用户。
 
 验收标准：
 
-- `project-kb --help` 能列出所有命令。
-- `project-kb context --help` 能说明 `--repo`、`--query`、`--budget`、`--format`。
+- `project-atlas --help` 能列出所有命令。
+- `project-atlas context --help` 能说明 `--repo`、`--query`、`--budget`、`--format`。
 - 参数错误时 exit code 非 0，并输出可操作提示。
 
 ### 2. JSON Schema 独立化
@@ -61,7 +61,7 @@
 
 - 增加 adapter README 的安装步骤。
 - 增加最小手工验收清单。
-- 用一个临时项目验证 `project_kb_scan`、`project_kb_context`、`project_kb_propose`。
+- 用一个临时项目验证 `project_atlas_scan`、`project_atlas_context`、`project_atlas_propose`。
 
 验收标准：
 
@@ -182,7 +182,7 @@
 
 当前状态：
 
-- 已提供 `project-kb-mcp` 本地 stdio MCP server。
+- 已提供 `project-atlas-mcp` 本地 stdio MCP server。
 - MCP server 只暴露安全工具，不暴露 apply。
 
 完成内容：
@@ -211,7 +211,7 @@
 
 验收标准：
 
-- 每个 adapter 都只依赖 `project-kb` CLI。
+- 每个 adapter 都只依赖 `project-atlas` CLI。
 - 每个 adapter 都不提供 apply 能力。
 
 ### 11. 外部代码证据接入
@@ -297,7 +297,7 @@
 
 - 2026-05-21 已新增 `remember` 和 `check`。
 - 项目记忆仍然落在 `knowledge/`，并且只能通过 proposal 和人工终端 apply 进入仓库。
-- MCP 已新增 `project_kb_remember` 和 `project_kb_check`，仍然不暴露 apply。
+- MCP 已新增 `project_atlas_remember` 和 `project_atlas_check`，仍然不暴露 apply。
 - 详细实现记录见 `docs/development-log/2026-05-21-memory-capability.md`。
 
 ### 15. 记忆候选和 proposal

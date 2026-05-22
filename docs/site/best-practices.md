@@ -1,6 +1,6 @@
-# Project KB 最佳实践
+# Project Atlas 最佳实践
 
-Project KB 适合沉淀稳定、可验证、会被多次复用的项目知识。它不适合自动生成整仓长文档。
+Project Atlas 适合沉淀稳定、可验证、会被多次复用的项目知识。它不适合自动生成整仓长文档。
 
 ## 写什么
 
@@ -51,7 +51,7 @@ Project KB 适合沉淀稳定、可验证、会被多次复用的项目知识。
 生成记忆 proposal：
 
 ```bash
-project-kb remember --repo /path/to/repo --candidate-file memory.json --reason "capture stable project memory"
+project-atlas remember --repo /path/to/repo --candidate-file memory.json --reason "capture stable project memory"
 ```
 
 默认不会覆盖已有目标文件。确实要替换时，显式加 `--replace-existing`，并在 review 中说明原因。
@@ -62,26 +62,26 @@ project-kb remember --repo /path/to/repo --candidate-file memory.json --reason "
 - 跨模块需求完成后，运行 `scan` 和 `stale`。
 - 由 agent 生成 proposal，由人 review 后再 apply。
 - 每次发布前确认 `review-summary` 没有敏感阻断。
-- 发布前或交接前运行 `project-kb check`，确认知识库健康。
+- 发布前或交接前运行 `project-atlas check`，确认知识库健康。
 
 ## Agent 使用建议
 
 Agent 开始任务前先读：
 
 ```bash
-project-kb context --repo /path/to/repo --query "<task topic>"
+project-atlas context --repo /path/to/repo --query "<task topic>"
 ```
 
 任务结束后，如果稳定知识发生变化，再生成 proposal：
 
 ```bash
-project-kb propose --repo /path/to/repo --updates-file updates.json --reason "refresh project knowledge"
+project-atlas propose --repo /path/to/repo --updates-file updates.json --reason "refresh project knowledge"
 ```
 
 如果任务沉淀的是项目记忆，使用：
 
 ```bash
-project-kb remember --repo /path/to/repo --candidate-file memory.json --reason "capture task memory"
+project-atlas remember --repo /path/to/repo --candidate-file memory.json --reason "capture task memory"
 ```
 
-Project KB 的重点是让团队少重复解释项目背景，同时保留人工把关。
+Project Atlas 的重点是让团队少重复解释项目背景，同时保留人工把关。

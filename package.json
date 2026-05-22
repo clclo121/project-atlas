@@ -1,20 +1,22 @@
 {
-  "name": "project-kb-core",
+  "name": "project-atlas",
   "version": "0.1.0",
-  "description": "Git-first project knowledge base governance CLI for AI coding agents.",
+  "description": "Project Atlas is a Git-first project knowledge base CLI for AI coding agents and reviewers.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "project-kb": "./dist/index.js",
-    "project-kb-mcp": "./dist/mcp.js"
+    "project-atlas": "./dist/index.js",
+    "project-atlas-mcp": "./dist/mcp.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/clclo121/project-kb-core.git"
+    "url": "git+https://github.com/clclo121/project-atlas.git"
   },
   "keywords": [
     "ai-coding",
+    "project-atlas",
     "knowledge-base",
+    "project-memory",
     "opencode",
     "cli",
     "git"

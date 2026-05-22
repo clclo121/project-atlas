@@ -1,11 +1,11 @@
-# 2026-05-21 project-kb-core 初始抽取记录
+# 2026-05-21 project-atlas 初始抽取记录
 
 ## 实现范围
 
-- 新增独立 Node TypeScript CLI，入口为 `project-kb`。
+- 新增独立 Node TypeScript CLI，入口为 `project-atlas`。
 - 实现 `init`、`scan`、`context`、`stale`、`propose`、`apply`、`review-summary`、`cleanup`。
 - `knowledge/` 作为可提交知识资产。
-- `.project-kb/proposals/` 作为本地证据目录，并写入 `.gitignore`。
+- `.project-atlas/proposals/` 作为本地证据目录，并写入 `.gitignore`。
 - `apply` 保留终端 TTY 人工确认，不提供模型可直接调用的写入工具。
 - OpenCode 只提供示例适配层。
 

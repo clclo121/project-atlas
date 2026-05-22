@@ -1,11 +1,11 @@
 ---
-description: Generate project-kb update proposal
+description: Generate project-atlas update proposal
 ---
 
-Call `project_kb_scan` with `mode=changed`. If the scan shows stable project knowledge changed, create a proposal through `project_kb_propose`.
+Call `project_atlas_scan` with `mode=changed`. If the scan shows stable project knowledge changed, create a proposal through `project_atlas_propose`.
 
 Do not apply the proposal from OpenCode. Tell the user to run:
 
 ```bash
-project-kb apply --repo <repo> --proposal-id <id> --confirm
+project-atlas apply --repo <repo> --proposal-id <id> --confirm
 ```

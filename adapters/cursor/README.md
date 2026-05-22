@@ -1,15 +1,15 @@
 # Cursor Adapter
 
-Cursor can load `project-kb-mcp` through project or global MCP config.
+Cursor can load `project-atlas-mcp` through project or global MCP config.
 
 For project-scoped use, create `.cursor/mcp.json` in the target repository:
 
 ```json
 {
   "mcpServers": {
-    "project-kb": {
+    "project-atlas": {
       "type": "stdio",
-      "command": "project-kb-mcp",
+      "command": "project-atlas-mcp",
       "args": []
     }
   }
@@ -18,12 +18,12 @@ For project-scoped use, create `.cursor/mcp.json` in the target repository:
 
 Use the MCP tool list in Cursor to confirm these tools are available:
 
-- `project_kb_scan`
-- `project_kb_context`
-- `project_kb_stale`
-- `project_kb_propose`
-- `project_kb_remember`
-- `project_kb_check`
-- `project_kb_review_summary`
+- `project_atlas_scan`
+- `project_atlas_context`
+- `project_atlas_stale`
+- `project_atlas_propose`
+- `project_atlas_remember`
+- `project_atlas_check`
+- `project_atlas_review_summary`
 
 The adapter only exposes read and proposal evidence actions. A human must do terminal apply after checking the review summary.

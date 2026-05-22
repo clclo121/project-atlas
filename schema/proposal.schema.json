@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/liuliuyun/project-kb-core/schema/proposal.schema.json",
-  "title": "project-kb proposal",
+  "$id": "https://github.com/liuliuyun/project-atlas/schema/proposal.schema.json",
+  "title": "project-atlas proposal",
   "type": "object",
   "additionalProperties": false,
   "required": [

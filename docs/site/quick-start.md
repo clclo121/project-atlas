@@ -1,6 +1,6 @@
 # 快速开始
 
-本文帮助新用户在 10 分钟内跑通 Project KB 的最小流程。
+本文帮助新用户在 10 分钟内跑通 Project Atlas 的最小流程。
 
 ## 1. 准备项目
 
@@ -115,7 +115,7 @@ node dist/index.js review-summary --repo /path/to/repo
 node dist/index.js apply --repo /path/to/repo --proposal-id <id> --confirm
 ```
 
-Project KB 不允许 agent 直接 apply。这个边界是工具可控的关键。
+Project Atlas 不允许 agent 直接 apply。这个边界是工具可控的关键。
 
 ## 6. 健康检查
 

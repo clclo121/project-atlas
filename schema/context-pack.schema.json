@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/liuliuyun/project-kb-core/schema/context-pack.schema.json",
-  "title": "project-kb context pack",
+  "$id": "https://github.com/liuliuyun/project-atlas/schema/context-pack.schema.json",
+  "title": "project-atlas context pack",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "budget", "budget_used", "truncated", "text", "items"],
