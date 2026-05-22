@@ -1,10 +1,16 @@
 # Agent Quickstart
 
+Read trusted knowledge first. Touch source second.
+
+[English](agent-quickstart.md) | [简体中文](../agent-quickstart.md)
+
 This page is for AI coding agents. The goal is to read governed project knowledge in the first 60 seconds of a task, check knowledge health, and create reviewable proposals when durable knowledge should change.
 
 If you are a human user who wants the shortest command path first, read [Quick Start](quick-start.md).
 
-## Rules
+---
+
+## Rules To Keep
 
 - Read Project Atlas context before broad source exploration.
 - Default to read-only commands.
@@ -14,6 +20,8 @@ If you are a human user who wants the shortest command path first, read [Quick S
 - Do not configure `project-atlas apply` as an MCP tool, agent tool, hook, or automatic script.
 - If `knowledge/manifest.json` is missing, do not silently initialize the repository. Tell the user and provide the init command.
 - In your answer, list the knowledge files used, commands run, and anything that still needs human review.
+
+---
 
 ## First Probe
 
@@ -49,6 +57,8 @@ Use `frontend-app` for frontend repositories:
 project-atlas init --repo "$PWD" --template frontend-app
 ```
 
+---
+
 ## Read Context
 
 Read context by task keywords:
@@ -79,6 +89,8 @@ Inspect these fields:
 
 If `truncated` is `true`, narrow the query or raise `--budget`, then read context again.
 
+---
+
 ## Health Check
 
 Before creating a proposal, handing off work, or preparing a release, run:
@@ -88,6 +100,8 @@ project-atlas check --repo "$PWD" --format json
 ```
 
 If the result reports missing sources, stale sources, missing metadata, bad links, or duplicate topics, state the risk in your answer. Do not treat unhealthy knowledge as fully trusted.
+
+---
 
 ## Create A Knowledge Proposal
 
@@ -116,6 +130,8 @@ If the target file already has source metadata and the user explicitly wants to 
 ```bash
 project-atlas propose --repo "$PWD" --updates-file updates.json --reason "<why this knowledge changed>" --inherit-source-metadata
 ```
+
+---
 
 ## Create A Project Memory Proposal
 
@@ -151,6 +167,8 @@ Allowed memory types:
 - `experience`
 - `project_fact`
 
+---
+
 ## Review Summary
 
 After creating a proposal, read the summary:
@@ -169,6 +187,8 @@ Report at least:
 - apply safety
 - whether human terminal apply is still required
 
+---
+
 ## MCP
 
 When connected through `project-atlas-mcp`, use only these safe tools:
@@ -182,6 +202,8 @@ When connected through `project-atlas-mcp`, use only these safe tools:
 - `project_atlas_review_summary`
 
 There is no apply tool. If an MCP tool creates a proposal, tell the user to review it and apply it manually in a terminal.
+
+---
 
 ## MCP Client Config
 
@@ -214,12 +236,16 @@ mcpServers:
     args: []
 ```
 
+---
+
 ## Safety Boundary
 
 - never let the model call `project-atlas apply`
 - never bypass proposals and write `knowledge/**` directly
 - never treat chat logs as project memory source data
 - never treat unhealthy knowledge as final truth
+
+---
 
 ## Response Template
 

@@ -1,10 +1,16 @@
 # 快速开始
 
-这份文档给第一次接触 Project Atlas 的用户。目标是用最短路径跑通一次完整体验。
+10 分钟内跑通 Project Atlas。
+
+[English](en/quick-start.md) | [简体中文](quick-start.md)
+
+这份文档给第一次接触 Project Atlas 的用户。目标是用最短路径完成一次初始化、一次上下文读取和一次 proposal 生成。
 
 如果你是 AI agent 接入方，先看 [Agent 快速接入](agent-quickstart.md)。
 
-## 你会得到什么
+---
+
+## 跑完你会得到什么
 
 跑完这页之后，你会完成这些动作：
 
@@ -13,6 +19,8 @@
 3. 生成一份知识更新 proposal
 4. 查看 review 摘要
 5. 知道为什么 `apply` 只能人工执行
+
+---
 
 ## 方式一 从当前仓库直接试
 
@@ -32,6 +40,8 @@ node dist/index.js propose --repo /tmp/project-atlas-demo --updates-file updates
 node dist/index.js review-summary --repo /tmp/project-atlas-demo
 node dist/index.js check --repo /tmp/project-atlas-demo --format json
 ```
+
+---
 
 ## 方式二 作为 npm 包使用
 
@@ -55,6 +65,8 @@ project-atlas init --repo /path/to/repo --template generic-service
 - `java-backend`
 - `frontend-app`
 
+---
+
 ## 最短成功路径
 
 ### 1. 初始化知识库
@@ -70,7 +82,7 @@ project-atlas init --repo /path/to/repo --template generic-service
 - `knowledge/manifest.json`
 - `.project-atlas/proposals/`
 
-## 2. 读取上下文
+### 2. 读取上下文
 
 按任务关键词读取紧凑上下文：
 
@@ -84,7 +96,7 @@ project-atlas context --repo /path/to/repo --query "order payment" --budget 8000
 project-atlas context --repo /path/to/repo --source-file README.md --format json
 ```
 
-## 3. 生成知识 proposal
+### 3. 生成知识 proposal
 
 先准备 `updates.json`：
 
@@ -106,7 +118,7 @@ project-atlas context --repo /path/to/repo --source-file README.md --format json
 project-atlas propose --repo /path/to/repo --updates-file updates.json --reason "refresh overview"
 ```
 
-## 4. 查看 review 摘要
+### 4. 查看 review 摘要
 
 ```bash
 project-atlas review-summary --repo /path/to/repo
@@ -121,7 +133,11 @@ project-atlas review-summary --repo /path/to/repo
 - review decision
 - apply safety
 
-## 5. 为什么 apply 仍然是人工动作
+---
+
+## 最重要的边界
+
+### 为什么 apply 仍然是人工动作
 
 真实写入必须回到终端，由人执行：
 
@@ -130,6 +146,8 @@ project-atlas apply --repo /path/to/repo --proposal-id <id> --confirm
 ```
 
 原因很简单。Project Atlas 允许 agent 读上下文和生成 proposal，但不允许模型直接写项目知识库。
+
+---
 
 ## 下一步看什么
 

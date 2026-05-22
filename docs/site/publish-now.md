@@ -1,8 +1,14 @@
 # 现在发布指南
 
+今天就发包，先按这个顺序走。
+
+[English](en/publish-now.md) | [简体中文](publish-now.md)
+
 这份文档只回答一个问题。当前仓库如果今天就要发布到 npm，应该按什么顺序做。
 
 更长期的规则看 [发布流程](release-process.md)。
+
+---
 
 ## 当前结论
 
@@ -12,6 +18,8 @@
 - 当前不做 GitHub Release
 - 发布前应保证本地主分支已经同步到远端
 - `README.md` 和 `docs/site/` 已经是 npm 包的一部分，发包前要一起检查
+
+---
 
 ## 先看工作区状态
 
@@ -25,6 +33,8 @@ git remote -v
 ```bash
 git push origin main
 ```
+
+---
 
 ## 发布前检查清单
 
@@ -52,6 +62,8 @@ node dist/index.js check --help
 node dist/mcp.js --help
 ```
 
+---
+
 ## 检查打包内容
 
 `npm pack --dry-run` 应包含：
@@ -73,6 +85,8 @@ node dist/mcp.js --help
 - `docs/development-log/`
 - `node_modules/`
 
+---
+
 ## npm 登录
 
 确认当前 registry：
@@ -88,6 +102,8 @@ npm login
 npm whoami
 ```
 
+---
+
 ## 正式发布
 
 确认工作区干净后执行：
@@ -97,6 +113,8 @@ npm publish
 ```
 
 如果以后要做测试发布，再补 `--tag`。当前这份文档只覆盖正式默认发布。
+
+---
 
 ## 发布后验证
 
@@ -115,6 +133,8 @@ project-atlas --help
 project-atlas-mcp --help
 ```
 
+---
+
 ## 打 tag 并推送
 
 如果发布成功，再补版本 tag：
@@ -125,6 +145,8 @@ git push origin v0.1.0
 ```
 
 如果本次发布版本不是 `0.1.0`，把 tag 名改成真实版本号。
+
+---
 
 ## 失败时先看什么
 

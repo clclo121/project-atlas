@@ -1,12 +1,41 @@
 # Project Atlas Documentation
 
-Project Atlas is a Git-first project knowledge base CLI for open source maintainers, engineering teams, and AI coding agents.
+Read less source. Reuse more trusted project knowledge.
 
-It stores durable project knowledge under `knowledge/`, turns knowledge updates into reviewable proposals, and keeps final writes behind a human terminal confirmation.
+[English](README.md) | [简体中文](../README.md)
 
-Chinese documentation is available at [../README.md](../README.md).
+Project Atlas is a Git-first project knowledge base CLI for open source maintainers, engineering teams, and AI coding agents. It stores durable project knowledge under `knowledge/`, turns knowledge updates into reviewable proposals, and keeps final writes behind a human terminal confirmation.
 
-## What To Expect
+AI tools often re-read too much source, miss stable project facts, and leave teams with chat-only context. Project Atlas brings that knowledge back into the repository with governed docs, reviewable proposal flows, and a strict manual apply boundary.
+
+---
+
+## Quick Start
+
+Try the shortest local flow:
+
+```bash
+npm install
+npm run build
+node dist/index.js init --repo /tmp/project-atlas-demo --template generic-service
+node dist/index.js context --repo /tmp/project-atlas-demo --query demo --budget 8000 --format json
+node dist/index.js propose --repo /tmp/project-atlas-demo --updates-file updates.json --reason "demo update"
+node dist/index.js review-summary --repo /tmp/project-atlas-demo
+```
+
+After npm publish, install the package and use the stable commands:
+
+```bash
+npm install -g project-atlas
+project-atlas --help
+project-atlas-mcp --help
+```
+
+This gets you from repository setup to governed context and reviewable knowledge updates in one short pass.
+
+---
+
+## Why Project Atlas
 
 Project Atlas is useful when you want to:
 
@@ -21,6 +50,20 @@ Its core boundary stays simple:
 - agents must not run `project-atlas apply`
 - real writes still require a human terminal confirmation
 
+---
+
+## How It Works
+
+The most common sequence is:
+
+1. run `init` to create the knowledge base skeleton
+2. run `context` to read governed project context
+3. run `propose` or `remember` to create reviewable updates
+4. run `review-summary` before approval
+5. let a human run `apply` in a terminal
+
+---
+
 ## Start With One Path
 
 Choose the shortest route for your goal:
@@ -31,6 +74,8 @@ Choose the shortest route for your goal:
   Read [Agent Quickstart](agent-quickstart.md)
 - Publish this repo
   Read [Publish Now](publish-now.md)
+
+---
 
 ## Documentation Map
 
@@ -48,15 +93,5 @@ Choose the shortest route for your goal:
   The long-term release policy for this package
 - [Publish Now](publish-now.md)
   The current repository-specific release checklist
-
-## Typical Flow
-
-The most common sequence is:
-
-1. run `init` to create the knowledge base skeleton
-2. run `context` to read governed project context
-3. run `propose` or `remember` to create reviewable updates
-4. run `review-summary` before approval
-5. let a human run `apply` in a terminal
 
 If you want commands first, start with [Quick Start](quick-start.md).

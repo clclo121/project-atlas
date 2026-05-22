@@ -1,8 +1,14 @@
 # Publish Now
 
+If you need to publish today, start here.
+
+[English](publish-now.md) | [简体中文](../publish-now.md)
+
 This page answers one question. If this repository needs to be published to npm today, what is the order of operations.
 
 For the longer-term policy, read [Release Process](release-process.md).
+
+---
 
 ## Current Facts
 
@@ -12,6 +18,8 @@ For the longer-term policy, read [Release Process](release-process.md).
 - no GitHub Release flow is used right now
 - the local main branch should be synchronized with the remote before publishing
 - `README.md` and `docs/site/` are part of the npm package and must be checked before release
+
+---
 
 ## Check Repository State First
 
@@ -25,6 +33,8 @@ If the local main branch is ahead of the remote, push first:
 ```bash
 git push origin main
 ```
+
+---
 
 ## Pre-Publish Checklist
 
@@ -52,6 +62,8 @@ node dist/index.js check --help
 node dist/mcp.js --help
 ```
 
+---
+
 ## Inspect The Package Contents
 
 `npm pack --dry-run` should include:
@@ -73,6 +85,8 @@ It should usually not include:
 - `docs/development-log/`
 - `node_modules/`
 
+---
+
 ## Log In To npm
 
 Confirm the active registry:
@@ -88,6 +102,8 @@ npm login
 npm whoami
 ```
 
+---
+
 ## Publish
 
 Once the working tree is clean and verification has passed, run:
@@ -97,6 +113,8 @@ npm publish
 ```
 
 If you later need staged releases, add `--tag`. This page covers the default production publish flow only.
+
+---
 
 ## Post-Publish Checks
 
@@ -115,6 +133,8 @@ project-atlas --help
 project-atlas-mcp --help
 ```
 
+---
+
 ## Create And Push The Tag
 
 If the publish succeeded, create the version tag:
@@ -125,6 +145,8 @@ git push origin v0.1.0
 ```
 
 If the release version is not `0.1.0`, replace the tag with the real version.
+
+---
 
 ## What To Check First If It Fails
 

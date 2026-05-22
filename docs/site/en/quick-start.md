@@ -1,10 +1,16 @@
 # Quick Start
 
-This page is for first-time users who want the shortest successful run of Project Atlas.
+Get Project Atlas running in 10 minutes.
+
+[English](quick-start.md) | [简体中文](../quick-start.md)
+
+This page is for first-time users who want one short path from repository setup to governed context and a reviewable proposal.
 
 If you are integrating an AI agent, read [Agent Quickstart](agent-quickstart.md) first.
 
-## What You Will Do
+---
+
+## What You Will Finish
 
 By the end of this page, you will:
 
@@ -13,6 +19,8 @@ By the end of this page, you will:
 3. create a knowledge proposal
 4. review the proposal summary
 5. understand why `apply` stays manual
+
+---
 
 ## Option 1: Try It From This Repository
 
@@ -32,6 +40,8 @@ node dist/index.js propose --repo /tmp/project-atlas-demo --updates-file updates
 node dist/index.js review-summary --repo /tmp/project-atlas-demo
 node dist/index.js check --repo /tmp/project-atlas-demo --format json
 ```
+
+---
 
 ## Option 2: Use The npm Package
 
@@ -55,6 +65,8 @@ Available templates:
 - `java-backend`
 - `frontend-app`
 
+---
+
 ## The Shortest Successful Flow
 
 ### 1. Initialize The Knowledge Base
@@ -70,7 +82,7 @@ This creates:
 - `knowledge/manifest.json`
 - `.project-atlas/proposals/`
 
-## 2. Read Context
+### 2. Read Context
 
 Read compact context by task keywords:
 
@@ -84,7 +96,7 @@ If you already know a source file, look up knowledge by source file:
 project-atlas context --repo /path/to/repo --source-file README.md --format json
 ```
 
-## 3. Create A Knowledge Proposal
+### 3. Create A Knowledge Proposal
 
 Prepare `updates.json`:
 
@@ -106,7 +118,7 @@ Create the proposal:
 project-atlas propose --repo /path/to/repo --updates-file updates.json --reason "refresh overview"
 ```
 
-## 4. Read The Review Summary
+### 4. Read The Review Summary
 
 ```bash
 project-atlas review-summary --repo /path/to/repo
@@ -121,7 +133,11 @@ This is the fastest way to inspect:
 - review decision
 - apply safety
 
-## 5. Keep Apply Manual
+---
+
+## The Most Important Boundary
+
+### Keep Apply Manual
 
 Real writes still require a human terminal action:
 
@@ -130,6 +146,8 @@ project-atlas apply --repo /path/to/repo --proposal-id <id> --confirm
 ```
 
 Project Atlas allows agents to read context and create proposals. It does not allow agents to apply knowledge changes directly.
+
+---
 
 ## What To Read Next
 
