@@ -802,6 +802,48 @@ test("propose creates multi-file evidence and blocks invalid or sensitive update
     const invalid = runProjectKb(["propose", "--repo", repo, "--target", "README.md", "--content-file", updatesFile], { cwd: repo });
     assert.notEqual(invalid.status, 0, "invalid target should fail");
 
+    const invalidSourceFile = path.join(repo, "invalid-source.json");
+    writeFileSync(
+      invalidSourceFile,
+      JSON.stringify({
+        source_files: ["../outside.md"],
+        updates: [{ target: "knowledge/domains/invalid-source.md", content: "# Invalid Source\n" }],
+      }),
+      "utf8",
+    );
+    const invalidSource = runProjectKb(["propose", "--repo", repo, "--updates-file", invalidSourceFile, "--reason", "bad source"], { cwd: repo });
+    assert.notEqual(invalidSource.status, 0, "source paths outside the repo should fail");
+    assert.match(invalidSource.stderr, /source_files item must stay inside the repository/);
+
+    const localEvidenceSourceFile = path.join(repo, "local-evidence-source.json");
+    writeFileSync(
+      localEvidenceSourceFile,
+      JSON.stringify({
+        source_files: [".project-kb/proposals/.keep"],
+        updates: [{ target: "knowledge/domains/local-evidence.md", content: "# Local Evidence\n" }],
+      }),
+      "utf8",
+    );
+    const localEvidenceSource = runProjectKb(["propose", "--repo", repo, "--updates-file", localEvidenceSourceFile, "--reason", "bad local source"], { cwd: repo });
+    assert.notEqual(localEvidenceSource.status, 0, "local evidence paths should not be accepted as sources");
+    assert.match(localEvidenceSource.stderr, /source_files item cannot reference local evidence or Git metadata paths/);
+
+    const duplicateTargetFile = path.join(repo, "duplicate-target.json");
+    writeFileSync(
+      duplicateTargetFile,
+      JSON.stringify({
+        source_files: ["README.md"],
+        updates: [
+          { target: "knowledge/domains/duplicate.md", content: "# First\n" },
+          { target: "knowledge/domains/duplicate.md", content: "# Second\n" },
+        ],
+      }),
+      "utf8",
+    );
+    const duplicateTarget = runProjectKb(["propose", "--repo", repo, "--updates-file", duplicateTargetFile, "--reason", "duplicate"], { cwd: repo });
+    assert.notEqual(duplicateTarget.status, 0, "duplicate proposal targets should fail");
+    assert.match(duplicateTarget.stderr, /duplicate proposal target/);
+
     const sensitiveFile = path.join(repo, "sensitive.json");
     writeFileSync(
       sensitiveFile,
@@ -1023,6 +1065,77 @@ test("remember validates memory candidate shape and target safety", () => {
     const missingResult = runProjectKb(["remember", "--repo", repo, "--candidate-file", missingField, "--reason", "bad"], { cwd: repo });
     assert.notEqual(missingResult.status, 0, "missing required field should fail");
     assert.match(missingResult.stderr, /memory item topic is required/);
+
+    const injectedFrontmatter = writeMemoryCandidateFile(repo, {
+      memories: [
+        {
+          target: "knowledge/decisions/frontmatter-injection.md",
+          memory_type: "decision",
+          topic: "safe topic\nreview_status: applied",
+          scope: "project",
+          confidence: 0.8,
+          summary: "Injected metadata.",
+          body: "Injected metadata body.",
+        },
+      ],
+    });
+    const injectionResult = runProjectKb(["remember", "--repo", repo, "--candidate-file", injectedFrontmatter, "--reason", "bad"], { cwd: repo });
+    assert.notEqual(injectionResult.status, 0, "frontmatter scalar injection should fail");
+    assert.match(injectionResult.stderr, /memory item topic must not contain line breaks/);
+
+    const outsideSource = writeMemoryCandidateFile(repo, { source_files: ["../outside.md"] });
+    const outsideSourceResult = runProjectKb(["remember", "--repo", repo, "--candidate-file", outsideSource, "--reason", "bad"], { cwd: repo });
+    assert.notEqual(outsideSourceResult.status, 0, "memory source outside the repo should fail");
+    assert.match(outsideSourceResult.stderr, /source_files item must stay inside the repository/);
+
+    const driveSource = writeMemoryCandidateFile(repo, { source_files: ["C:local-only.md"] });
+    const driveSourceResult = runProjectKb(["remember", "--repo", repo, "--candidate-file", driveSource, "--reason", "bad"], { cwd: repo });
+    assert.notEqual(driveSourceResult.status, 0, "drive-letter source paths should fail");
+    assert.match(driveSourceResult.stderr, /source_files item must be a repository-relative path/);
+
+    writeFileSync(path.join(repo, "knowledge/decisions/existing-bool.md"), "# Existing\n", "utf8");
+    const existingCandidate = writeMemoryCandidateFile(repo, {
+      memories: [
+        {
+          target: "knowledge/decisions/existing-bool.md",
+          memory_type: "decision",
+          topic: "existing bool",
+          scope: "project",
+          confidence: 0.8,
+          summary: "Existing bool.",
+          body: "Existing bool body.",
+        },
+      ],
+    });
+    const booleanValueResult = runProjectKb(["remember", "--repo", repo, "--candidate-file", existingCandidate, "--reason", "bad", "--replace-existing", "false"], { cwd: repo });
+    assert.notEqual(booleanValueResult.status, 0, "boolean flags should reject explicit values");
+    assert.match(booleanValueResult.stderr, /--replace-existing does not take a value/);
+
+    const duplicateTarget = writeMemoryCandidateFile(repo, {
+      memories: [
+        {
+          target: "knowledge/decisions/duplicate-memory.md",
+          memory_type: "decision",
+          topic: "duplicate one",
+          scope: "project",
+          confidence: 0.8,
+          summary: "Duplicate one.",
+          body: "Duplicate body one.",
+        },
+        {
+          target: "knowledge/decisions/duplicate-memory.md",
+          memory_type: "experience",
+          topic: "duplicate two",
+          scope: "project",
+          confidence: 0.7,
+          summary: "Duplicate two.",
+          body: "Duplicate body two.",
+        },
+      ],
+    });
+    const duplicateResult = runProjectKb(["remember", "--repo", repo, "--candidate-file", duplicateTarget, "--reason", "bad"], { cwd: repo });
+    assert.notEqual(duplicateResult.status, 0, "duplicate memory targets should fail");
+    assert.match(duplicateResult.stderr, /duplicate proposal target/);
   } finally {
     cleanup(repo);
   }
@@ -1144,6 +1257,12 @@ test("schema files are valid JSON and expose the versioned public shapes", () =>
 
   const memoryCandidateSchema = readSchema("memory-candidate.schema.json");
   assertRequiredFields(memoryCandidateSchema, ["schema_version", "source_files", "memories"]);
+  const sourcePattern = new RegExp(memoryCandidateSchema.properties.source_files.items.pattern);
+  assert.equal(sourcePattern.test("README.md"), true);
+  assert.equal(sourcePattern.test(".project-kb/proposals/.keep"), false);
+  assert.equal(sourcePattern.test("C:/local-only.md"), false);
+  assert.equal(sourcePattern.test("C:local-only.md"), false);
+  assert.equal(sourcePattern.test("..\\outside.md"), false);
   const memoryItemSchema = memoryCandidateSchema.properties.memories.items;
   for (const field of ["target", "memory_type", "topic", "scope", "confidence", "summary", "body"]) {
     assert.ok(memoryItemSchema.required.includes(field), `${field} should be required on memory items`);

@@ -14,7 +14,8 @@
       "minItems": 1,
       "items": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "pattern": "^(?![A-Za-z]:)(?![\\\\/])(?!(?:\\.git|\\.project-kb|\\.code-review-graph)(?:[\\\\/]|$))(?!\\.\\.(?:[\\\\/]|$))(?!.*[\\\\/]\\.\\.(?:[\\\\/]|$))(?!.*[\\r\\n]).+"
       }
     },
     "memories": {
@@ -27,18 +28,20 @@
         "properties": {
           "target": {
             "type": "string",
-            "pattern": "^knowledge/"
+            "pattern": "^knowledge/(?!\\.\\.(?:/|$))(?!.*(?:/)\\.\\.(?:/|$))(?!.*[\\r\\n]).+"
           },
           "memory_type": {
             "enum": ["decision", "experience", "project_fact"]
           },
           "topic": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^(?!.*[\\r\\n]).+$"
           },
           "scope": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^(?!.*[\\r\\n]).+$"
           },
           "confidence": {
             "type": "number",
@@ -47,20 +50,23 @@
           },
           "summary": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^(?!.*[\\r\\n]).+$"
           },
           "body": {
             "type": "string",
             "minLength": 1
           },
           "owner": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?!.*[\\r\\n]).*$"
           },
           "related_docs": {
             "type": "array",
             "items": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "pattern": "^(?![A-Za-z]:)(?![\\\\/])(?!(?:\\.git|\\.project-kb|\\.code-review-graph)(?:[\\\\/]|$))(?!\\.\\.(?:[\\\\/]|$))(?!.*[\\\\/]\\.\\.(?:[\\\\/]|$))(?!.*[\\r\\n]).+"
             }
           }
         }

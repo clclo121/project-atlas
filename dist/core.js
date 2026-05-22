@@ -18,6 +18,12 @@ const commandOptions = {
     cleanup: ["repo", "force"],
     hash: ["repo", "path"],
 };
+const booleanOptions = {
+    propose: ["inherit-source-metadata"],
+    remember: ["replace-existing"],
+    apply: ["confirm"],
+    cleanup: ["force"],
+};
 const initTemplates = {
     "generic-service": {
         displayName: "Generic Service",
@@ -805,8 +811,12 @@ function createProposal(repo, inputData, reason, inheritSourceMetadata = false) 
     const dir = path.join(root, proposalId);
     ensureDir(dir);
     const targetFiles = inputData.updates.map((update) => validateKnowledgeTarget(update.target));
+    const duplicateTarget = firstDuplicate(targetFiles);
+    if (duplicateTarget) {
+        throw new Error(`duplicate proposal target: ${duplicateTarget}`);
+    }
     const inheritedSourceFiles = inheritSourceMetadata ? inheritedSourceFilesForTargets(repo, targetFiles) : [];
-    const sourceFiles = unique([...inheritedSourceFiles, ...(inputData.source_files ?? [])].filter(Boolean).map(normalizeRepoPath));
+    const sourceFiles = unique([...inheritedSourceFiles, ...(inputData.source_files ?? [])].filter(Boolean).map((source) => validateRepoRelativePath(source, "source_files item")));
     const sourceHashes = Object.fromEntries(sourceFiles.map((source) => [source, repoFileHash(repo, source)]));
     const sensitiveTargets = inputData.updates.filter((update) => hasSensitiveContent(update.content)).map((update) => validateKnowledgeTarget(update.target));
     const status = sensitiveTargets.length ? "blocked_sensitive" : "proposed";
@@ -858,7 +868,11 @@ function loadUpdateInput(repo, target, contentFile, updatesFile) {
         if (!Array.isArray(parsed.updates) || parsed.updates.length === 0) {
             throw new Error("updates-file must contain a non-empty updates array.");
         }
-        return { source_files: parsed.source_files ?? [], external_evidence: validateExternalEvidenceItems(parsed.external_evidence ?? []), updates: parsed.updates };
+        return {
+            source_files: validateSourceFiles(parsed.source_files ?? []),
+            external_evidence: validateExternalEvidenceItems(parsed.external_evidence ?? []),
+            updates: parsed.updates,
+        };
     }
     if (!target || !contentFile) {
         throw new Error("provide --updates-file or --target with --content-file");
@@ -886,7 +900,7 @@ function loadMemoryCandidate(repo, candidateFile) {
         if (typeof source !== "string" || !source.trim()) {
             throw new Error("memory candidate source_files items must be strings.");
         }
-        return normalizeRepoPath(source);
+        return validateRepoRelativePath(source, "source_files item");
     });
     if (!Array.isArray(parsed.memories) || parsed.memories.length === 0) {
         throw new Error("memory candidate memories must be a non-empty array.");
@@ -903,9 +917,9 @@ function validateMemoryCandidateItem(raw) {
     }
     const target = validateKnowledgeTarget(requiredMemoryString(raw, "target"));
     const memoryType = memoryTypeValue(requiredMemoryString(raw, "memory_type"), "memory item memory_type");
-    const topic = requiredMemoryString(raw, "topic");
-    const scope = requiredMemoryString(raw, "scope");
-    const summary = requiredMemoryString(raw, "summary");
+    const topic = validateFrontmatterScalar(requiredMemoryString(raw, "topic"), "memory item topic");
+    const scope = validateFrontmatterScalar(requiredMemoryString(raw, "scope"), "memory item scope");
+    const summary = validateFrontmatterScalar(requiredMemoryString(raw, "summary"), "memory item summary");
     const body = requiredMemoryString(raw, "body");
     const confidence = raw.confidence;
     if (typeof confidence !== "number" || confidence < 0 || confidence > 1) {
@@ -916,7 +930,9 @@ function validateMemoryCandidateItem(raw) {
         if (typeof raw.owner !== "string") {
             throw new Error("memory item owner must be a string.");
         }
-        item.owner = raw.owner;
+        const owner = validateFrontmatterScalar(raw.owner, "memory item owner");
+        if (owner)
+            item.owner = owner;
     }
     if (raw.related_docs !== undefined) {
         if (!Array.isArray(raw.related_docs)) {
@@ -926,7 +942,7 @@ function validateMemoryCandidateItem(raw) {
             if (typeof doc !== "string" || !doc.trim()) {
                 throw new Error("memory item related_docs items must be strings.");
             }
-            return normalizeRepoPath(doc);
+            return validateRepoRelativePath(doc, "memory item related_docs item");
         });
     }
     return item;
@@ -943,6 +959,17 @@ function memoryCandidateToUpdateInput(repo, candidate, replaceExisting) {
         };
     });
     return { source_files: candidate.source_files, external_evidence: [], updates };
+}
+function validateSourceFiles(value) {
+    if (!Array.isArray(value)) {
+        throw new Error("source_files must be an array.");
+    }
+    return value.map((source) => {
+        if (typeof source !== "string" || !source.trim()) {
+            throw new Error("source_files items must be strings.");
+        }
+        return validateRepoRelativePath(source, "source_files item");
+    });
 }
 function buildMemoryContent(memory, sourceFiles, sourceHashes) {
     const body = memory.body.trim();
@@ -1228,8 +1255,49 @@ function truncate(value, budget) {
 function unique(values) {
     return [...new Set(values)];
 }
+function firstDuplicate(values) {
+    const seen = new Set();
+    for (const value of values) {
+        if (seen.has(value)) {
+            return value;
+        }
+        seen.add(value);
+    }
+    return "";
+}
 function normalizeRepoPath(value) {
-    return value.split(path.sep).join("/");
+    return value.replace(/\\/g, "/").split(path.sep).join("/");
+}
+function validateRepoRelativePath(value, label) {
+    const normalizedSeparators = normalizeRepoPath(value);
+    if (/[\r\n\0]/.test(normalizedSeparators)) {
+        throw new Error(`${label} must be a repository-relative path without line breaks.`);
+    }
+    const raw = normalizedSeparators.trim();
+    if (!raw) {
+        throw new Error(`${label} must be a repository-relative path without line breaks.`);
+    }
+    if (/^[A-Za-z]:/.test(raw)) {
+        throw new Error(`${label} must be a repository-relative path.`);
+    }
+    if (path.posix.isAbsolute(raw) || raw.split("/").includes("..")) {
+        throw new Error(`${label} must stay inside the repository.`);
+    }
+    const normalized = path.posix.normalize(raw);
+    if (!normalized || normalized === "." || path.posix.isAbsolute(normalized) || normalized.startsWith("../") || normalized.includes("/../")) {
+        throw new Error(`${label} must stay inside the repository.`);
+    }
+    const root = normalized.split("/")[0];
+    if (root === ".git" || root === ".project-kb" || root === ".code-review-graph") {
+        throw new Error(`${label} cannot reference local evidence or Git metadata paths.`);
+    }
+    return normalized;
+}
+function validateFrontmatterScalar(value, label) {
+    if (/[\r\n\0]/.test(value)) {
+        throw new Error(`${label} must not contain line breaks.`);
+    }
+    return value.trim();
 }
 function templateFlag(flags) {
     const value = stringFlag(flags, "template", "generic-service");
@@ -1265,9 +1333,13 @@ function parseArgs(argv) {
 }
 function validateFlags(command, flags) {
     const allowed = new Set([...(commandOptions[command] ?? []), "help", "h"]);
+    const booleanFlags = new Set([...(booleanOptions[command] ?? []), "help", "h"]);
     for (const key of Object.keys(flags)) {
         if (!allowed.has(key)) {
             throw usageError(command, `Unknown option: --${key}`);
+        }
+        if (booleanFlags.has(key) && typeof flags[key] === "string") {
+            throw usageError(command, `--${key} does not take a value`);
         }
     }
 }

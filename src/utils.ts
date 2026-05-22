@@ -156,6 +156,9 @@ export function proposalRoot(repo: string): string {
 }
 
 export function validateKnowledgeTarget(target: string): string {
+  if (/[\r\n\0]/.test(target)) {
+    throw new Error(`Invalid target path: ${target}`);
+  }
   const normalized = toPosix(path.posix.normalize(target));
   if (normalized.startsWith("../") || normalized.includes("/../") || path.isAbsolute(normalized)) {
     throw new Error(`Invalid target path: ${target}`);

@@ -140,6 +140,9 @@ export function proposalRoot(repo) {
     return path.join(repo, ".project-kb", "proposals");
 }
 export function validateKnowledgeTarget(target) {
+    if (/[\r\n\0]/.test(target)) {
+        throw new Error(`Invalid target path: ${target}`);
+    }
     const normalized = toPosix(path.posix.normalize(target));
     if (normalized.startsWith("../") || normalized.includes("/../") || path.isAbsolute(normalized)) {
         throw new Error(`Invalid target path: ${target}`);

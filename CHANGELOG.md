@@ -12,6 +12,7 @@
 - Added context filters and JSON metadata for project memory documents.
 - Added MCP tools for remember and check without changing the terminal apply boundary.
 - Added `schema/memory-candidate.schema.json`.
+- Hardened memory and proposal inputs by rejecting unsafe source paths, frontmatter line breaks, duplicate targets, and boolean flag values.
 
 ## 0.1.0
 
