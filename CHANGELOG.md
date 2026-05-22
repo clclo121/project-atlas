@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.1.2 - 2026-05-22
+
+- Added a fuller OpenCode adapter surface with check, remember, review-summary, generate, and status command flows.
+- Added shared OpenCode adapter helpers for command execution and review-summary output formatting.
+- Extended OpenCode adapter documentation, skills, and development logs for the productized command set.
+- Expanded automated test coverage for the OpenCode adapter commands and safe entrypoints.
+
 ## 0.1.1 - 2026-05-22
 
 - Reworked the documentation into a bilingual product-style landing experience across the root README, site homepages, quick start guides, agent onboarding guides, and publish-now guides.

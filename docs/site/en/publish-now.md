@@ -13,7 +13,7 @@ For the longer-term policy, read [Release Process](release-process.md).
 ## Current Facts
 
 - package name: `project-atlas`
-- current version: `0.1.1`
+- current version: `0.1.2`
 - current release flow: manual publish
 - no GitHub Release flow is used right now
 - the local main branch should be synchronized with the remote before publishing
@@ -140,11 +140,11 @@ project-atlas-mcp --help
 If the publish succeeded, create the version tag:
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
-If the release version is not `0.1.1`, replace the tag with the real version.
+If the release version is not `0.1.2`, replace the tag with the real version.
 
 ---
 
