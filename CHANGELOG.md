@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.1.3 - 2026-05-22
+
+- Consolidated the OpenCode-facing docs into a clearer product entry with aligned site navigation and onboarding copy.
+- Added a scripted npm release flow with preflight checks, publish validation, tag handling, and local install smoke tests.
+- Expanded release documentation and test coverage for scripted publishing and package governance.
+
 ## 0.1.2 - 2026-05-22
 
 - Added a fuller OpenCode adapter surface with check, remember, review-summary, generate, and status command flows.
