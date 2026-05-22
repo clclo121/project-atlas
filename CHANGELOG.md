@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0 - 2026-05-22
+
 - Fixed proposal freshness checks so `apply` blocks when the base commit or source file hashes changed after proposal creation.
 - Added proposal-level `source_hashes` snapshots to the public proposal schema.
 - Fixed `review-summary` apply safety so missing source and missing metadata in non-scaffold knowledge documents block apply.
@@ -15,9 +17,7 @@
 - Hardened memory and proposal inputs by rejecting unsafe source paths, frontmatter line breaks, duplicate targets, and boolean flag values.
 - Rewrote README in Chinese and added a concrete npm publishing guide.
 - Renamed the project, package, CLI, MCP server, adapter tools, and local evidence directory to Project Atlas.
-
-## 0.1.0
-
+- Added bilingual documentation entry points and agent-first quick onboarding docs.
 - Added the first `project-atlas` CLI with `init`, `scan`, `context`, `stale`, `propose`, `apply`, `review-summary`, `cleanup`, and `hash`.
 - Added Git-first knowledge layout under `knowledge/` and local proposal evidence under `.project-atlas/proposals/`.
 - Added interactive TTY-only `apply` flow for generated knowledge changes.

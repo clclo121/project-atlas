@@ -1,15 +1,20 @@
 # Project Atlas 文档
 
-这里是 `project-atlas` 的轻量文档入口。文档保持 Markdown 形态，方便直接在 GitHub、编辑器或团队知识库里阅读。
+这里是 `project-atlas` 的轻量文档入口。文档保持 Markdown 形态，方便直接在 GitHub、编辑器、团队知识库或 agent 上下文里阅读。
+
+English documentation is available at [en/README.md](en/README.md).
+
+如果是 agent 接入，不要从长文档开始。直接读 [Agent Quickstart](agent-quickstart.md)，然后按里面的命令执行。
 
 ## 推荐阅读顺序
 
-1. [快速开始](quick-start.md)
-2. [最佳实践](best-practices.md)
-3. [团队落地流程](team-rollout.md)
-4. [安全 FAQ](security-faq.md)
-5. [发布流程](release-process.md)
-6. [现在发布指南](publish-now.md)
+1. [Agent Quickstart](agent-quickstart.md)
+2. [快速开始](quick-start.md)
+3. [最佳实践](best-practices.md)
+4. [团队落地流程](team-rollout.md)
+5. [安全 FAQ](security-faq.md)
+6. [发布流程](release-process.md)
+7. [现在发布指南](publish-now.md)
 
 ## 10 分钟体验路径
 

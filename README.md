@@ -16,7 +16,13 @@ CLI 命令名是 `project-atlas`。本地 MCP server 命令名是 `project-atlas
 
 先看 [docs/site/README.md](docs/site/README.md)。里面包含快速开始、最佳实践、团队落地、安全 FAQ 和发布流程。
 
+Agent 自动接入优先看 [docs/site/agent-quickstart.md](docs/site/agent-quickstart.md)。这份文档给 agent 用，包含首轮探测、只读上下文、proposal 生成和禁止 apply 的规则。
+
+English docs start at [docs/site/en/README.md](docs/site/en/README.md). Agent-first onboarding is available at [docs/site/en/agent-quickstart.md](docs/site/en/agent-quickstart.md).
+
 如果现在准备发布 npm 包，直接看 [docs/site/publish-now.md](docs/site/publish-now.md)。
+
+开源协作请看 [CONTRIBUTING.md](CONTRIBUTING.md)。安全问题和 agent 写入边界请看 [SECURITY.md](SECURITY.md)。
 
 ## 常用命令
 

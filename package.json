@@ -28,8 +28,10 @@
     "templates",
     "docs/site",
     "CHANGELOG.md",
+    "CONTRIBUTING.md",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "SECURITY.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
