@@ -1,18 +1,20 @@
 # Quick Start
 
-Get Project Atlas running in 10 minutes.
+Start with the shortest CLI flow. OpenCode users should go straight to the dedicated guide.
 
 [English](quick-start.md) | [简体中文](../quick-start.md)
 
-This page is for first-time users who want one short path from repository setup to governed context and a reviewable proposal.
+This page is for first-time Project Atlas users. It keeps the shortest CLI path only. It no longer carries the full OpenCode tutorial.
 
-If you are integrating an AI agent, read [Agent Quickstart](agent-quickstart.md) first.
+If you are using Project Atlas inside OpenCode, read the [OpenCode guide](../../adapters/opencode/README.md).
+
+If you are integrating another AI agent or MCP client, read [Agent Quickstart](agent-quickstart.md) first.
 
 ---
 
-## What You Will Finish
+## Shortest CLI Flow
 
-By the end of this page, you will:
+After this page, you will:
 
 1. initialize `knowledge/`
 2. read governed project context
@@ -20,9 +22,7 @@ By the end of this page, you will:
 4. review the proposal summary
 5. understand why `apply` stays manual
 
----
-
-## Option 1: Try It From This Repository
+### 1. Run It From This Repository
 
 Install dependencies and build:
 
@@ -41,9 +41,7 @@ node dist/index.js review-summary --repo /tmp/project-atlas-demo
 node dist/index.js check --repo /tmp/project-atlas-demo --format json
 ```
 
----
-
-## Option 2: Use The npm Package
+### 2. Use The npm Package
 
 Once the package is published, or if it is already installed locally:
 
@@ -53,52 +51,23 @@ project-atlas --help
 project-atlas-mcp --help
 ```
 
-Initialize a repository:
+The shortest command flow is:
 
 ```bash
 project-atlas init --repo /path/to/repo --template generic-service
+project-atlas context --repo /path/to/repo --query "order payment" --budget 8000 --format json
+project-atlas propose --repo /path/to/repo --updates-file updates.json --reason "refresh overview"
+project-atlas review-summary --repo /path/to/repo
 ```
 
-Available templates:
-
-- `generic-service`
-- `java-backend`
-- `frontend-app`
-
----
-
-## The Shortest Successful Flow
-
-### 1. Initialize The Knowledge Base
-
-```bash
-project-atlas init --repo /path/to/repo --template generic-service
-```
-
-This creates:
+Initialization creates:
 
 - `knowledge/`
 - `knowledge/project/overview.md`
 - `knowledge/manifest.json`
 - `.project-atlas/proposals/`
 
-### 2. Read Context
-
-Read compact context by task keywords:
-
-```bash
-project-atlas context --repo /path/to/repo --query "order payment" --budget 8000 --format json
-```
-
-If you already know a source file, look up knowledge by source file:
-
-```bash
-project-atlas context --repo /path/to/repo --source-file README.md --format json
-```
-
-### 3. Create A Knowledge Proposal
-
-Prepare `updates.json`:
+When you prepare `updates.json`, the minimum shape looks like this:
 
 ```json
 {
@@ -112,32 +81,9 @@ Prepare `updates.json`:
 }
 ```
 
-Create the proposal:
+The review summary helps you see the proposal id, source files, target files, dry-run summary, review decision, and apply safety.
 
-```bash
-project-atlas propose --repo /path/to/repo --updates-file updates.json --reason "refresh overview"
-```
-
-### 4. Read The Review Summary
-
-```bash
-project-atlas review-summary --repo /path/to/repo
-```
-
-This is the fastest way to inspect:
-
-- proposal id
-- source files
-- target files
-- dry-run summary
-- review decision
-- apply safety
-
----
-
-## The Most Important Boundary
-
-### Keep Apply Manual
+## Manual Apply Boundary
 
 Real writes still require a human terminal action:
 
@@ -147,13 +93,13 @@ project-atlas apply --repo /path/to/repo --proposal-id <id> --confirm
 
 Project Atlas allows agents to read context and create proposals. It does not allow agents to apply knowledge changes directly.
 
----
+## Where To Go Next
 
-## What To Read Next
-
-- Want to integrate an AI agent
+- If you are using OpenCode
+  Read the [OpenCode guide](../../adapters/opencode/README.md)
+- If you are integrating another AI agent
   Read [Agent Quickstart](agent-quickstart.md)
-- Want guidance on what knowledge to keep
+- If you want guidance on what knowledge to keep
   Read [Best Practices](best-practices.md)
-- Want to publish this repository
+- If you want to publish this repository
   Read [Publish Now](publish-now.md)

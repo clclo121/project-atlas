@@ -70,6 +70,8 @@ Choose the shortest route for your goal:
 
 - Try it now
   Read [Quick Start](quick-start.md)
+- Use it in OpenCode
+  Read the [OpenCode guide](../../adapters/opencode/README.md)
 - Integrate an agent
   Read [Agent Quickstart](agent-quickstart.md)
 - Publish this repo
@@ -80,9 +82,11 @@ Choose the shortest route for your goal:
 ## Documentation Map
 
 - [Quick Start](quick-start.md)
-  The shortest path for a first successful run
+  The shortest CLI path, with a handoff to the OpenCode guide
+- [OpenCode guide](../../adapters/opencode/README.md)
+  The main user entry for OpenCode setup, generation, refresh, review, and memory
 - [Agent Quickstart](agent-quickstart.md)
-  The execution protocol for agent and MCP usage
+  The shared execution protocol for general agent and MCP usage
 - [Best Practices](best-practices.md)
   What knowledge to keep, what to leave out, and how to keep it trustworthy
 - [Team Rollout](team-rollout.md)

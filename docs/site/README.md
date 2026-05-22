@@ -70,6 +70,8 @@ Project Atlas 适合这些场景：
 
 - 现在就试用
   看 [快速开始](quick-start.md)
+- 在 OpenCode 中使用
+  看 [OpenCode 使用文档](../../adapters/opencode/README.zh-CN.md)
 - 接入 AI agent
   看 [Agent 快速接入](agent-quickstart.md)
 - 准备发布当前仓库
@@ -80,9 +82,11 @@ Project Atlas 适合这些场景：
 ## 文档地图
 
 - [快速开始](quick-start.md)
-  第一次跑通最短流程，包含本仓库构建试用和 npm 安装试用
+  只保留 CLI 最短路径，并分流到 OpenCode 专属文档
+- [OpenCode 使用文档](../../adapters/opencode/README.zh-CN.md)
+  OpenCode 用户主入口，覆盖首次生成、增量刷新、review 和 memory
 - [Agent 快速接入](agent-quickstart.md)
-  给 AI agent 和工具接入方的执行协议
+  给通用 agent 和工具接入方的执行协议
 - [最佳实践](best-practices.md)
   说明什么知识适合写进知识库，什么不适合
 - [团队落地流程](team-rollout.md)

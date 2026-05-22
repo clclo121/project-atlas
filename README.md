@@ -90,6 +90,7 @@ The MCP server exposes safe tools only. There is no MCP apply tool.
 Choose a starting path:
 
 - Try it now: [English Quick Start](docs/site/en/quick-start.md) or [中文快速开始](docs/site/quick-start.md)
+- Use it in OpenCode: [English OpenCode guide](adapters/opencode/README.md) or [中文 OpenCode 使用文档](adapters/opencode/README.zh-CN.md)
 - Integrate an agent: [English Agent Quickstart](docs/site/en/agent-quickstart.md) or [中文 Agent 快速接入](docs/site/agent-quickstart.md)
 - Publish this repo: [English release notes](docs/site/en/publish-now.md) or [中文发布指南](docs/site/publish-now.md)
 
