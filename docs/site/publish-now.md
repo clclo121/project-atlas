@@ -13,7 +13,7 @@
 ## 当前结论
 
 - 包名是 `project-atlas`
-- 当前版本是 `0.1.0`
+- 当前版本是 `0.1.1`
 - 当前发布方式是手工发布
 - 当前不做 GitHub Release
 - 发布前应保证本地主分支已经同步到远端
@@ -140,11 +140,11 @@ project-atlas-mcp --help
 如果发布成功，再补版本 tag：
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
-如果本次发布版本不是 `0.1.0`，把 tag 名改成真实版本号。
+如果本次发布版本不是 `0.1.1`，把 tag 名改成真实版本号。
 
 ---
 

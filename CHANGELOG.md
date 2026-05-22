@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.1.1 - 2026-05-22
+
+- Reworked the documentation into a bilingual product-style landing experience across the root README, site homepages, quick start guides, agent onboarding guides, and publish-now guides.
+- Added matching development-log notes for the documentation restructuring and style follow-up work.
+
 ## 0.1.0 - 2026-05-22
 
 - Fixed proposal freshness checks so `apply` blocks when the base commit or source file hashes changed after proposal creation.

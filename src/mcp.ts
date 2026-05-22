@@ -27,7 +27,7 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 
 const server = new McpServer({
   name: "project-atlas",
-  version: "0.1.0",
+  version: "0.1.1",
 });
 
 server.registerTool(
