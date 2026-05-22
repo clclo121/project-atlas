@@ -102,6 +102,10 @@ export function ensureKnowledgeFrontmatter(content: string, metadata: KnowledgeM
   return `${buildFrontmatter(metadata)}${content}`;
 }
 
+export function hasFrontmatter(content: string): boolean {
+  return /^---\r?\n/.test(content) && /\r?\n---(?:\r?\n|$)/.test(content);
+}
+
 function isMemoryType(value: string): value is MemoryType {
   return value === "decision" || value === "experience" || value === "project_fact";
 }

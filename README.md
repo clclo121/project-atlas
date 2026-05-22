@@ -17,10 +17,27 @@ Try the repository build:
 ```bash
 npm install
 npm run build
-node dist/index.js init --repo /tmp/project-atlas-demo --template generic-service
-node dist/index.js context --repo /tmp/project-atlas-demo --query demo --budget 8000 --format json
-node dist/index.js propose --repo /tmp/project-atlas-demo --updates-file updates.json --reason "demo update"
-node dist/index.js review-summary --repo /tmp/project-atlas-demo
+PROJECT_ATLAS_REPO="$PWD"
+DEMO_REPO=/tmp/project-atlas-demo
+mkdir -p "$DEMO_REPO"
+cd "$DEMO_REPO"
+git init
+printf '# Demo Project\n\nThis repo demonstrates project-atlas.\n' > README.md
+cat > updates.json <<'JSON'
+{
+  "source_files": ["README.md"],
+  "updates": [
+    {
+      "target": "knowledge/project/overview.md",
+      "content": "# Project Overview\n\nThis demo repository is used to verify Project Atlas.\n"
+    }
+  ]
+}
+JSON
+node "$PROJECT_ATLAS_REPO/dist/index.js" init --repo "$DEMO_REPO" --template generic-service
+node "$PROJECT_ATLAS_REPO/dist/index.js" context --repo "$DEMO_REPO" --query demo --budget 8000 --format json
+node "$PROJECT_ATLAS_REPO/dist/index.js" propose --repo "$DEMO_REPO" --updates-file updates.json --reason "demo update"
+node "$PROJECT_ATLAS_REPO/dist/index.js" review-summary --repo "$DEMO_REPO"
 ```
 
 After npm publish, install the package and use the stable commands:

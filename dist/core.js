@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "
 import path from "node:path";
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { buildFrontmatter, ensureKnowledgeFrontmatter, parseFrontmatter } from "./frontmatter.js";
+import { buildFrontmatter, ensureKnowledgeFrontmatter, hasFrontmatter, parseFrontmatter } from "./frontmatter.js";
 import { scanRepo } from "./scanner.js";
 import { currentCommit, ensureDir, ensureEvidenceIgnored, fileHash, proposalRoot, readJson, removeFileIfExists, replaceFileAtomic, repoFileHash, resolveRepo, sha256Text, updateGitignore, validateKnowledgeTarget, walkFiles, worktreeHash, writeIfMissing, writeJson, } from "./utils.js";
 const commandOptions = {
@@ -13,7 +13,7 @@ const commandOptions = {
     propose: ["repo", "target", "content-file", "updates-file", "reason", "inherit-source-metadata", "external-evidence-file"],
     remember: ["repo", "candidate-file", "reason", "format", "replace-existing"],
     check: ["repo", "format"],
-    apply: ["repo", "proposal-id", "confirm"],
+    apply: ["repo", "proposal-id", "all", "confirm", "yes-all"],
     "review-summary": ["repo", "proposal-id"],
     cleanup: ["repo", "force"],
     hash: ["repo", "path"],
@@ -21,7 +21,7 @@ const commandOptions = {
 const booleanOptions = {
     propose: ["inherit-source-metadata"],
     remember: ["replace-existing"],
-    apply: ["confirm"],
+    apply: ["all", "confirm", "yes-all"],
     cleanup: ["force"],
 };
 const initTemplates = {
@@ -176,14 +176,20 @@ const commandHelp = {
     ].join("\n"),
     apply: [
         "Usage: project-atlas apply --repo <repo> --proposal-id <id> --confirm",
+        "Usage: project-atlas apply --repo <repo> --all --confirm",
+        "Usage: project-atlas apply --repo <repo> --all --confirm --yes-all",
         "",
         "Options:",
         "  --repo <path>          Git repository path. Defaults to current directory.",
         "  --proposal-id <id>     Proposal id under .project-atlas/proposals/.",
+        "  --all                  Apply all proposed proposals with interactive confirmation.",
         "  --confirm              Required. Still asks for interactive TTY confirmation.",
+        "  --yes-all              With --all, ask once before applying all proposed proposals.",
         "",
-        "Example:",
+        "Examples:",
         "  project-atlas apply --repo /path/to/repo --proposal-id kb-20260521-120000-1 --confirm",
+        "  project-atlas apply --repo /path/to/repo --all --confirm",
+        "  project-atlas apply --repo /path/to/repo --all --confirm --yes-all",
     ].join("\n"),
     "review-summary": [
         "Usage: project-atlas review-summary --repo <repo> [--proposal-id <id>]",
@@ -300,6 +306,8 @@ function cmdInit(flags) {
         "knowledge/integrations",
         "knowledge/quality",
         "knowledge/decisions",
+        "knowledge/logs",
+        "knowledge/assets",
         ".project-atlas/proposals",
     ]) {
         ensureDir(path.join(repo, dir));
@@ -316,12 +324,16 @@ function cmdInit(flags) {
         "- [Integrations](integrations/README.md)",
         "- [Quality](quality/README.md)",
         "- [Decisions](decisions/README.md)",
+        "- [Logs](logs/README.md)",
+        "- [Assets](assets/README.md)",
         "",
     ].join("\n"));
     writeIfMissing(path.join(repo, "knowledge/glossary.md"), "# Glossary\n\nRecord stable domain terms here.\n");
     for (const dir of ["domains", "workflows", "contracts", "integrations", "quality", "decisions"]) {
         writeIfMissing(path.join(repo, "knowledge", dir, "README.md"), `# ${dir}\n\n${template.sections[dir]}\n`);
     }
+    writeIfMissing(path.join(repo, "knowledge/logs/README.md"), "# logs\n\nRecord short human-maintained maintenance notes and lifecycle entries here.\n");
+    writeIfMissing(path.join(repo, "knowledge/assets/README.md"), "# assets\n\nTrack supporting knowledge assets and reference materials here without storing generated proposals.\n");
     writeIfMissing(path.join(repo, "knowledge/project/overview.md"), `${buildFrontmatter({ source_files: ["README.md"], source_hashes: { "README.md": repoFileHash(repo, "README.md") } })}# Project Overview\n\n${template.overview}\n`);
     writeIfMissing(path.join(repo, "knowledge/manifest.json"), `${JSON.stringify({
         schema_version: "1.0",
@@ -352,6 +364,7 @@ function cmdContext(flags) {
     const items = collectContextItems(repo, { query, sourceFile, memoryType, topic, scope });
     const markdown = renderContextMarkdown(items);
     const truncated = truncate(markdown, budget);
+    const budgetedItems = budgetContextItems(items, budget);
     if (format === "json") {
         console.log(JSON.stringify({
             schema_version: "1.0",
@@ -359,7 +372,7 @@ function cmdContext(flags) {
             budget_used: truncated.budget_used,
             truncated: truncated.truncated,
             text: truncated.text,
-            items: items.map((item) => ({ ...item, content: truncate(item.content, budget).text })),
+            items: budgetedItems,
         }, null, 2));
         return;
     }
@@ -388,11 +401,17 @@ function cmdPropose(flags) {
         throw new Error("--target and --updates-file cannot be used together");
     }
     const inputData = loadUpdateInput(repo, target, contentFile, updatesFile);
+    assertProposalContentHasNoFrontmatter(inputData.updates);
     const proposal = createProposal(repo, { ...inputData, external_evidence: [...(inputData.external_evidence ?? []), ...externalEvidence] }, reason, inheritSourceMetadata);
     console.log(`proposal_id: ${proposal.proposal_id}`);
     console.log(`proposal_status: ${proposal.proposal_status}`);
     console.log(`proposal_hash: ${proposal.proposal_hash}`);
-    console.log(`apply: project-atlas apply --repo ${repo} --proposal-id ${proposal.proposal_id} --confirm`);
+    if (proposal.proposal_status === "proposed") {
+        console.log(`apply: project-atlas apply --repo ${repo} --proposal-id ${proposal.proposal_id} --confirm`);
+    }
+    else {
+        console.log(`review: project-atlas review-summary --repo ${repo} --proposal-id ${proposal.proposal_id}`);
+    }
 }
 function cmdRemember(flags) {
     const repo = resolveRepo(stringFlag(flags, "repo", "."));
@@ -410,21 +429,33 @@ function cmdRemember(flags) {
     const inputData = memoryCandidateToUpdateInput(repo, loadMemoryCandidate(repo, candidateFile), replaceExisting);
     const proposal = createProposal(repo, inputData, reason, false);
     const applyCommand = `project-atlas apply --repo ${repo} --proposal-id ${proposal.proposal_id} --confirm`;
+    const reviewCommand = `project-atlas review-summary --repo ${repo} --proposal-id ${proposal.proposal_id}`;
     if (format === "json") {
-        console.log(JSON.stringify({
+        const output = {
             schema_version: "1.0",
             proposal_id: proposal.proposal_id,
             proposal_status: proposal.proposal_status,
             proposal_hash: proposal.proposal_hash,
             target_files: proposal.target_files,
-            apply_command: applyCommand,
-        }, null, 2));
+        };
+        if (proposal.proposal_status === "proposed") {
+            output.apply_command = applyCommand;
+        }
+        else {
+            output.review_command = reviewCommand;
+        }
+        console.log(JSON.stringify(output, null, 2));
         return;
     }
     console.log(`proposal_id: ${proposal.proposal_id}`);
     console.log(`proposal_status: ${proposal.proposal_status}`);
     console.log(`proposal_hash: ${proposal.proposal_hash}`);
-    console.log(`apply: ${applyCommand}`);
+    if (proposal.proposal_status === "proposed") {
+        console.log(`apply: ${applyCommand}`);
+    }
+    else {
+        console.log(`review: ${reviewCommand}`);
+    }
 }
 function cmdCheck(flags) {
     const repo = resolveRepo(stringFlag(flags, "repo", "."));
@@ -438,9 +469,14 @@ function cmdCheck(flags) {
 }
 async function cmdApply(flags) {
     const repo = resolveRepo(stringFlag(flags, "repo", "."));
-    const proposalId = stringFlag(flags, "proposal-id", "");
-    if (!proposalId) {
-        throw new Error("--proposal-id is required");
+    const proposalId = optionalStringFlag(flags, "proposal-id");
+    const applyAll = Boolean(flags.all);
+    const yesAll = Boolean(flags["yes-all"]);
+    if (Boolean(proposalId) === applyAll) {
+        throw new Error("provide exactly one of --proposal-id or --all");
+    }
+    if (yesAll && !applyAll) {
+        throw new Error("--yes-all requires --all");
     }
     if (!flags.confirm) {
         throw new Error("--confirm is required for apply");
@@ -448,22 +484,108 @@ async function cmdApply(flags) {
     if (!process.stdin.isTTY) {
         throw new Error("apply requires an interactive TTY confirmation.");
     }
-    const proposalPath = path.join(proposalRoot(repo), proposalId, "proposal.json");
-    const proposal = readJson(proposalPath);
+    const rl = readline.createInterface({ input, output });
+    try {
+        if (applyAll) {
+            await applyAllProposals(repo, rl, yesAll);
+            return;
+        }
+        const proposal = loadProposal(repo, proposalId ?? "");
+        assertProposalNotBlocked(proposal);
+        assertProposalStillFresh(repo, proposal);
+        const confirmed = await askYesNo(rl, `Apply proposal ${proposal.proposal_id}? Type y or n: `);
+        if (!confirmed) {
+            throw new Error("apply cancelled by user.");
+        }
+        assertProposalWorktreeFresh(repo, proposal);
+        applyProposal(repo, proposal);
+    }
+    finally {
+        rl.close();
+    }
+}
+async function applyAllProposals(repo, rl, yesAll) {
+    const proposals = proposedProposals(repo);
+    if (!proposals.length) {
+        console.log("No proposed proposals found.");
+        return;
+    }
+    const selected = [];
+    if (yesAll) {
+        console.log(`Proposed proposals: ${proposals.length}`);
+        for (const proposal of proposals) {
+            console.log(`- ${proposal.proposal_id}: ${proposal.target_files.join(", ") || "no targets"}`);
+        }
+        const confirmed = await askYesNo(rl, "Apply all proposed proposals? Type y or n: ");
+        if (!confirmed) {
+            throw new Error("apply cancelled by user.");
+        }
+        selected.push(...proposals);
+    }
+    else {
+        for (const proposal of proposals) {
+            const confirmed = await askYesNo(rl, `Apply proposal ${proposal.proposal_id} (${proposal.target_files.join(", ") || "no targets"})? Type y or n: `);
+            if (confirmed) {
+                selected.push(proposal);
+            }
+            else {
+                console.log(`skipped: ${proposal.proposal_id}`);
+            }
+        }
+    }
+    if (!selected.length) {
+        console.log("No proposals selected.");
+        return;
+    }
+    for (const proposal of selected) {
+        assertProposalNotBlocked(proposal);
+        assertProposalWorktreeFresh(repo, proposal);
+    }
+    for (const proposal of selected) {
+        applyProposal(repo, proposal);
+    }
+}
+function loadProposal(repo, proposalId) {
+    return readJson(path.join(proposalRoot(repo), proposalId, "proposal.json"));
+}
+function proposedProposals(repo) {
+    const root = proposalRoot(repo);
+    if (!existsSync(root)) {
+        return [];
+    }
+    return readdirSync(root, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => {
+        const proposalPath = path.join(root, entry.name, "proposal.json");
+        return existsSync(proposalPath) ? readJson(proposalPath) : null;
+    })
+        .filter((proposal) => proposal !== null && proposal.proposal_status === "proposed")
+        .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.proposal_id.localeCompare(b.proposal_id));
+}
+async function askYesNo(rl, question) {
+    while (true) {
+        const answer = (await rl.question(question)).trim().toLowerCase();
+        if (answer === "y")
+            return true;
+        if (answer === "n")
+            return false;
+        console.log("Please type y or n.");
+    }
+}
+function assertProposalNotBlocked(proposal) {
     if (proposal.proposal_status === "blocked_sensitive") {
         throw new Error("blocked_sensitive proposals cannot be applied.");
     }
-    assertProposalStillFresh(repo, proposal);
-    const rl = readline.createInterface({ input, output });
-    const answer = await rl.question(`Apply proposal ${proposalId}? Type yes to continue: `);
-    rl.close();
-    if (answer.trim() !== "yes") {
-        throw new Error("apply cancelled by user.");
-    }
+}
+function assertProposalWorktreeFresh(repo, proposal) {
     if (worktreeHash(repo) !== proposal.worktree_diff_hash) {
         throw new Error("worktree changed during confirmation; aborting apply.");
     }
+}
+function applyProposal(repo, proposal) {
+    assertProposalNotBlocked(proposal);
     assertProposalStillFresh(repo, proposal);
+    const proposalPath = path.join(proposalRoot(repo), proposal.proposal_id, "proposal.json");
     const appliedParts = [];
     for (const operation of proposal.operations) {
         const targetAbs = path.join(repo, operation.path);
@@ -658,6 +780,14 @@ function contextMetadata(metadata) {
         result.related_docs = metadata.related_docs;
     return Object.keys(result).length ? result : undefined;
 }
+function budgetContextItems(items, budget) {
+    let remaining = budget;
+    return items.map((item) => {
+        const content = remaining > 0 ? truncate(item.content, remaining).text : "";
+        remaining = Math.max(0, remaining - content.length);
+        return { ...item, content };
+    });
+}
 function staleItems(repo) {
     return knowledgeMarkdownFiles(repo)
         .map((rel) => {
@@ -723,6 +853,9 @@ function checkKnowledge(repo) {
         if (!existsSync(path.join(repo, rel))) {
             items.push(checkIssue("error", "missing_required_file", rel, "required knowledge file is missing.", "Restore the file or update required_files in knowledge/manifest.json."));
         }
+    }
+    if (existsSync(path.join(repo, ".opencode/kb-proposals"))) {
+        items.push(checkIssue("warning", "legacy_opencode_proposals", ".opencode/kb-proposals", "legacy OpenCode proposal directory is present.", "Review or migrate pending proposals, then keep new proposals under .project-atlas/proposals."));
     }
     const topicPaths = new Map();
     for (const rel of knowledgeMarkdownFiles(repo)) {
@@ -817,6 +950,7 @@ function createProposal(repo, inputData, reason, inheritSourceMetadata = false) 
     }
     const inheritedSourceFiles = inheritSourceMetadata ? inheritedSourceFilesForTargets(repo, targetFiles) : [];
     const sourceFiles = unique([...inheritedSourceFiles, ...(inputData.source_files ?? [])].filter(Boolean).map((source) => validateRepoRelativePath(source, "source_files item")));
+    assertSourceFilesExist(repo, sourceFiles);
     const sourceHashes = Object.fromEntries(sourceFiles.map((source) => [source, repoFileHash(repo, source)]));
     const sensitiveTargets = inputData.updates.filter((update) => hasSensitiveContent(update.content)).map((update) => validateKnowledgeTarget(update.target));
     const status = sensitiveTargets.length ? "blocked_sensitive" : "proposed";
@@ -970,6 +1104,21 @@ function validateSourceFiles(value) {
         }
         return validateRepoRelativePath(source, "source_files item");
     });
+}
+function assertSourceFilesExist(repo, sourceFiles) {
+    for (const source of sourceFiles) {
+        const abs = path.join(repo, source);
+        if (!existsSync(abs) || !statSync(abs).isFile()) {
+            throw new Error(`source file does not exist: ${source}`);
+        }
+    }
+}
+function assertProposalContentHasNoFrontmatter(updates) {
+    for (const update of updates) {
+        if (hasFrontmatter(update.content)) {
+            throw new Error("proposal content must not include frontmatter; project-atlas generates metadata automatically.");
+        }
+    }
 }
 function buildMemoryContent(memory, sourceFiles, sourceHashes) {
     const body = memory.body.trim();

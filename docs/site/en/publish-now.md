@@ -46,19 +46,24 @@ Make sure these files reflect the current release:
 - `docs/site/README.md`
 - `docs/site/en/README.md`
 
-Then run the fixed verification commands:
+Prefer the scripted verification entry first:
 
 ```bash
-npm run lint:types
-npm test
+npm run release:verify
+```
+
+If the script is unavailable, run the fixed verification commands:
+
+```bash
 npm run verify
-npm pack --dry-run
+npm run pack:dry-run
 node dist/index.js --help
 node dist/index.js init --help
 node dist/index.js context --help
 node dist/index.js propose --help
 node dist/index.js remember --help
 node dist/index.js check --help
+node dist/index.js apply --help
 node dist/mcp.js --help
 ```
 
@@ -109,10 +114,27 @@ npm whoami
 Once the working tree is clean and verification has passed, run:
 
 ```bash
-npm publish
+npm run release:npm
 ```
 
-If you later need staged releases, add `--tag`. This page covers the default production publish flow only.
+This script automates these steps:
+
+- verify a clean working tree
+- verify that `package.json` is ahead of the npm registry version
+- verify that `CHANGELOG.md` contains the current version section
+- run the release verification commands
+- push `main` when needed
+- run `npm publish`
+- run post-publish checks
+- create and push the release tag
+
+If you only want to run checks without publishing, use:
+
+```bash
+npm run release:verify
+```
+
+If you later need staged releases, extend the script flags. This script currently covers the default production publish flow.
 
 ---
 

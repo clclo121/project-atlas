@@ -70,14 +70,11 @@ node dist/mcp.js --help
 推荐顺序如下：
 
 1. 更新版本号和 `CHANGELOG.md`
-2. 执行固定验证
-3. 检查 `npm pack --dry-run` 输出
-4. 确认工作区干净
-5. 创建提交
-6. 推送到远端主分支
-7. 执行 `npm login` 和 `npm whoami`
-8. 执行 `npm publish`
-9. 创建版本 tag 并推送
+2. 创建并推送发布提交
+3. 执行 `npm run release:verify`
+4. 执行 `npm run release:npm`
+
+如果脚本不可用，再回退到手工命令流程。
 
 ## 发布后检查
 

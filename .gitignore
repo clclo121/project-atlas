@@ -6,3 +6,9 @@ node_modules/
 .project-atlas/
 *.log
 .DS_Store
+.code-review-graph
+# >>> project-atlas >>>
+.project-atlas/
+knowledge/**/.kbtmp.*
+knowledge/**/*.kbtmp.*
+# <<< project-atlas <<<

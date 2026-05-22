@@ -46,19 +46,24 @@ git push origin main
 - `docs/site/README.md`
 - `docs/site/en/README.md`
 
-再执行固定验证：
+优先执行脚本化校验：
 
 ```bash
-npm run lint:types
-npm test
+npm run release:verify
+```
+
+如果脚本不可用，再执行固定验证：
+
+```bash
 npm run verify
-npm pack --dry-run
+npm run pack:dry-run
 node dist/index.js --help
 node dist/index.js init --help
 node dist/index.js context --help
 node dist/index.js propose --help
 node dist/index.js remember --help
 node dist/index.js check --help
+node dist/index.js apply --help
 node dist/mcp.js --help
 ```
 
@@ -109,10 +114,27 @@ npm whoami
 确认工作区干净后执行：
 
 ```bash
-npm publish
+npm run release:npm
 ```
 
-如果以后要做测试发布，再补 `--tag`。当前这份文档只覆盖正式默认发布。
+这个脚本会自动完成这些动作：
+
+- 检查工作区是否干净
+- 检查 `package.json` 版本是否大于 npm registry 当前版本
+- 校验 `CHANGELOG.md` 是否包含当前版本章节
+- 执行发布前验证
+- 必要时先推送 `main`
+- 执行 `npm publish`
+- 做发布后校验
+- 创建并推送版本 tag
+
+如果你只想先跑校验，不真正发布，执行：
+
+```bash
+npm run release:verify
+```
+
+如果以后要做测试发布，再扩脚本参数。当前这份脚本覆盖正式默认发布。
 
 ---
 

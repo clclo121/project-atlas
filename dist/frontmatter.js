@@ -98,6 +98,9 @@ export function ensureKnowledgeFrontmatter(content, metadata) {
     }
     return `${buildFrontmatter(metadata)}${content}`;
 }
+export function hasFrontmatter(content) {
+    return /^---\r?\n/.test(content) && /\r?\n---(?:\r?\n|$)/.test(content);
+}
 function isMemoryType(value) {
     return value === "decision" || value === "experience" || value === "project_fact";
 }

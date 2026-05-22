@@ -70,14 +70,11 @@ It should usually not include:
 The recommended order is:
 
 1. update the version and `CHANGELOG.md`
-2. run the fixed verification commands
-3. inspect `npm pack --dry-run`
-4. confirm a clean working tree
-5. create the release commit
-6. push to the main remote branch
-7. run `npm login` and `npm whoami`
-8. run `npm publish`
-9. create and push the version tag
+2. create and push the release commit
+3. run `npm run release:verify`
+4. run `npm run release:npm`
+
+If the script is unavailable, fall back to the manual command flow.
 
 ## Post-Release Checks
 

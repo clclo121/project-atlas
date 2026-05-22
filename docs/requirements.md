@@ -102,6 +102,15 @@ project-atlas apply --repo <repo> --proposal-id <id> --confirm
 
 系统要求 TTY 确认，并在确认后再次校验 worktree hash 和目标文件 hash。
 
+用户也可以在终端批量处理仍处于 proposed 状态的 proposal：
+
+```bash
+project-atlas apply --repo <repo> --all --confirm
+project-atlas apply --repo <repo> --all --confirm --yes-all
+```
+
+批量写入仍然要求 TTY 人工确认，不提供给 agent 或 MCP 自动调用。
+
 ### 4.6 reviewer 审查知识库更新
 
 用户执行：
@@ -118,9 +127,11 @@ project-atlas review-summary --repo <repo> --proposal-id <id>
 
 - 必须只支持 Git 仓库。
 - 必须创建 `knowledge/` 标准目录。
+- 必须创建 `knowledge/logs/` 和 `knowledge/assets/` 目录。
 - 必须创建 `knowledge/project/overview.md`。
 - 必须创建 `knowledge/manifest.json`。
 - 必须创建 `.project-atlas/proposals/`。
+- 必须在 `knowledge/index.md` 提供 `logs/` 和 `assets/` 目录入口。
 - 必须把 `.project-atlas/` 和 `knowledge/**/*.kbtmp.*` 写入 `.gitignore`。
 - 已存在文件不得覆盖。
 
@@ -166,6 +177,11 @@ project-atlas review-summary --repo <repo> --proposal-id <id>
 
 - 必须要求 `--confirm`。
 - 必须要求终端 TTY。
+- 必须支持 `--proposal-id <id>` 单个写入。
+- 必须支持 `--all` 批量写入 proposed proposal。
+- 必须支持 `--all --yes-all` 一次确认后批量写入。
+- `--proposal-id` 和 `--all` 必须二选一。
+- 人工确认输入只接受 `y` 和 `n`。
 - TTY 确认前不得写入目标知识文件。
 - 确认后必须重新校验 `worktree_diff_hash`。
 - 确认后必须重新校验目标文件当前 hash。
@@ -190,6 +206,8 @@ project-atlas review-summary --repo <repo> --proposal-id <id>
 - `/kb-generate` 只能作为 Project Atlas adapter 命令，用 `mode=full` 扫描结果生成首批知识正文 proposal。
 - `/kb-generate` 必须按 `knowledge/` 结构生成，默认采用核心加候选策略，不允许无证据铺满所有目录。
 - `/kb-generate` 生成的每篇正文必须绑定来源文件，并且必须通过 `project_atlas_propose` 进入 proposal。
+- OpenCode adapter 在生成长正文时必须优先使用文件输入，例如 `updatesFile` 或 `target + contentFile`。
+- OpenCode adapter 不应把长中文 Markdown 正文直接放进 tool JSON 参数。
 - 不允许提供 apply tool。
 - 必须提示用户真实写入要回到终端执行。
 

@@ -561,8 +561,8 @@ test("context supports multiple keywords, source lookup, source type, and trunca
     mkdirSync(path.join(repo, "openspec/changes/demo/specs/order"), { recursive: true });
     mkdirSync(path.join(repo, "openspec/specs/payment"), { recursive: true });
     mkdirSync(path.join(repo, "knowledge/domains"), { recursive: true });
-    writeFileSync(path.join(repo, "openspec/changes/demo/proposal.md"), "# Order Change\n\norder active context\n", "utf8");
-    writeFileSync(path.join(repo, "openspec/specs/payment/spec.md"), "# Payment Spec\n\npayment archived context\n", "utf8");
+    writeFileSync(path.join(repo, "openspec/changes/demo/proposal.md"), `# Order Change\n\norder active context ${"active ".repeat(80)}\n`, "utf8");
+    writeFileSync(path.join(repo, "openspec/specs/payment/spec.md"), `# Payment Spec\n\npayment archived context ${"archived ".repeat(80)}\n`, "utf8");
     writeFileSync(path.join(repo, "other.md"), "# Other\n", "utf8");
     writeFileSync(
       path.join(repo, "knowledge/domains/from-readme.md"),
@@ -611,6 +611,10 @@ test("context supports multiple keywords, source lookup, source type, and trunca
     assert.ok(payload.items.some((item) => item.source === "openspec/changes/demo/proposal.md" && item.source_type === "openspec_change"));
     assert.ok(payload.items.some((item) => item.source === "openspec/specs/payment/spec.md" && item.source_type === "openspec_spec"));
     assert.equal(payload.items[0].source_type, "openspec_change");
+    assert.ok(
+      payload.items.reduce((total, item) => total + item.content.length, 0) <= 120,
+      "json item content should share the global budget",
+    );
 
     const sourceLookup = runProjectKb(["context", "--repo", repo, "--source-file", "README.md", "--format", "json"], { cwd: repo });
     assert.equal(sourceLookup.status, 0, `source lookup should pass\nstdout:\n${sourceLookup.stdout}\nstderr:\n${sourceLookup.stderr}`);
@@ -848,6 +852,38 @@ test("propose creates multi-file evidence and blocks invalid or sensitive update
     assert.notEqual(localEvidenceSource.status, 0, "local evidence paths should not be accepted as sources");
     assert.match(localEvidenceSource.stderr, /source_files item cannot reference local evidence or Git metadata paths/);
 
+    const missingSourceFile = path.join(repo, "missing-source.json");
+    writeFileSync(
+      missingSourceFile,
+      JSON.stringify({
+        source_files: ["docs/missing.md"],
+        updates: [{ target: "knowledge/domains/missing-source.md", content: "# Missing Source\n" }],
+      }),
+      "utf8",
+    );
+    const missingSource = runProjectKb(["propose", "--repo", repo, "--updates-file", missingSourceFile, "--reason", "missing source"], { cwd: repo });
+    assert.notEqual(missingSource.status, 0, "missing source files should fail");
+    assert.match(missingSource.stderr, /source file does not exist: docs\/missing\.md/);
+
+    const frontmatterContentFile = path.join(repo, "frontmatter-content.json");
+    writeFileSync(
+      frontmatterContentFile,
+      JSON.stringify({
+        source_files: ["README.md"],
+        updates: [
+          {
+            target: "knowledge/domains/frontmatter.md",
+            content: "---\nsource_files:\n  - forged.md\n---\n# Forged\n",
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const frontmatterContent = runProjectKb(["propose", "--repo", repo, "--updates-file", frontmatterContentFile, "--reason", "frontmatter"], { cwd: repo });
+    assert.notEqual(frontmatterContent.status, 0, "proposal content with frontmatter should fail");
+    assert.match(frontmatterContent.stderr, /must not include frontmatter/);
+    assert.doesNotMatch(frontmatterContent.stdout, /apply: project-atlas apply/);
+
     const duplicateTargetFile = path.join(repo, "duplicate-target.json");
     writeFileSync(
       duplicateTargetFile,
@@ -875,6 +911,8 @@ test("propose creates multi-file evidence and blocks invalid or sensitive update
     );
     const sensitive = runProjectKb(["propose", "--repo", repo, "--updates-file", sensitiveFile, "--reason", "敏感内容测试"], { cwd: repo });
     assert.equal(sensitive.status, 0, `sensitive proposal should write blocked evidence\nstdout:\n${sensitive.stdout}\nstderr:\n${sensitive.stderr}`);
+    assert.doesNotMatch(sensitive.stdout, /apply: project-atlas apply/);
+    assert.match(sensitive.stdout, /review: project-atlas review-summary/);
     const blocked = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals/latest.json"), "utf8"));
     assert.equal(blocked.proposal_status, "blocked_sensitive");
     const blockedText = readFileSync(path.join(repo, ".project-atlas/proposals", blocked.proposal_id, "proposal.json"), "utf8");
@@ -1027,6 +1065,26 @@ test("remember creates reviewable memory proposals with metadata", () => {
     const replaced = runProjectKb(["remember", "--repo", repo, "--candidate-file", existingCandidate, "--reason", "显式覆盖", "--replace-existing"], { cwd: repo });
     assert.equal(replaced.status, 0, `remember replace should pass\nstdout:\n${replaced.stdout}\nstderr:\n${replaced.stderr}`);
     assert.match(replaced.stdout, /proposal_id:/);
+
+    const sensitiveCandidate = writeMemoryCandidateFile(repo, {
+      memories: [
+        {
+          target: "knowledge/decisions/sensitive-memory.md",
+          memory_type: "decision",
+          topic: "sensitive memory",
+          scope: "project",
+          confidence: 0.8,
+          summary: "Sensitive memory should be blocked.",
+          body: "password: secret-value-123456",
+        },
+      ],
+    });
+    const sensitiveRemember = runProjectKb(["remember", "--repo", repo, "--candidate-file", sensitiveCandidate, "--reason", "blocked", "--format", "json"], { cwd: repo });
+    assert.equal(sensitiveRemember.status, 0, `sensitive remember should write blocked evidence\nstdout:\n${sensitiveRemember.stdout}\nstderr:\n${sensitiveRemember.stderr}`);
+    const sensitiveOutput = JSON.parse(sensitiveRemember.stdout);
+    assert.equal(sensitiveOutput.proposal_status, "blocked_sensitive");
+    assert.equal(Object.hasOwn(sensitiveOutput, "apply_command"), false);
+    assert.match(sensitiveOutput.review_command, /project-atlas review-summary/);
   } finally {
     cleanup(repo);
   }
@@ -1112,6 +1170,11 @@ test("remember validates memory candidate shape and target safety", () => {
     const driveSourceResult = runProjectKb(["remember", "--repo", repo, "--candidate-file", driveSource, "--reason", "bad"], { cwd: repo });
     assert.notEqual(driveSourceResult.status, 0, "drive-letter source paths should fail");
     assert.match(driveSourceResult.stderr, /source_files item must be a repository-relative path/);
+
+    const missingSource = writeMemoryCandidateFile(repo, { source_files: ["docs/missing.md"] });
+    const missingSourceResult = runProjectKb(["remember", "--repo", repo, "--candidate-file", missingSource, "--reason", "bad"], { cwd: repo });
+    assert.notEqual(missingSourceResult.status, 0, "missing memory source files should fail");
+    assert.match(missingSourceResult.stderr, /source file does not exist: docs\/missing\.md/);
 
     writeFileSync(path.join(repo, "knowledge/decisions/existing-bool.md"), "# Existing\n", "utf8");
     const existingCandidate = writeMemoryCandidateFile(repo, {
@@ -1722,6 +1785,16 @@ test("P3 governance assets define docs site, CI matrix, and release scripts", ()
   for (const filePath of siteOpenCodeLinks) {
     const text = readFileSync(filePath, "utf8");
     assert.match(text, /adapters\/opencode\/README(\.zh-CN)?\.md/);
+  }
+  for (const filePath of [
+    path.join(projectRoot, "README.md"),
+    path.join(projectRoot, "docs/site/quick-start.md"),
+    path.join(projectRoot, "docs/site/en/quick-start.md"),
+  ]) {
+    const text = readFileSync(filePath, "utf8");
+    assert.match(text, /git init/);
+    assert.match(text, /README\.md/);
+    assert.match(text, /updates\.json/);
   }
 
   const englishSiteFiles = [
