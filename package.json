@@ -1,6 +1,6 @@
 {
   "name": "project-atlas",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Project Atlas is a Git-first project knowledge base CLI for AI coding agents and reviewers.",
   "license": "MIT",
   "type": "module",

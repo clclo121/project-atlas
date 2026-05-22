@@ -182,7 +182,14 @@ project-atlas review-summary --repo <repo> --proposal-id <id>
 ### 5.8 OpenCode adapter
 
 - 只作为示例适配层。
-- 只能提供 `scan`、`context`、`propose` 相关工具。
+- 只能提供 `scan`、`context`、`propose`、`remember`、`check`、`review-summary` 相关安全工具。
+- 可以提供面向用户的命令模板，例如 `/kb-context`、`/kb-refresh`、`/kb-generate`。
+- 可以提供 `/kb-check` 和 `/kb-review`，用于 proposal 生成后的健康检查和审核摘要。
+- 可以提供 `/kb-status`，用于聚合知识库健康状态和 latest proposal 状态。
+- 可以提供 `/kb-remember`，用于沉淀决策、经验和项目事实类 project memory proposal。
+- `/kb-generate` 只能作为 Project Atlas adapter 命令，用 `mode=full` 扫描结果生成首批知识正文 proposal。
+- `/kb-generate` 必须按 `knowledge/` 结构生成，默认采用核心加候选策略，不允许无证据铺满所有目录。
+- `/kb-generate` 生成的每篇正文必须绑定来源文件，并且必须通过 `project_atlas_propose` 进入 proposal。
 - 不允许提供 apply tool。
 - 必须提示用户真实写入要回到终端执行。
 

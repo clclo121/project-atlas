@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const projectRoot = path.resolve(import.meta.dirname, "..");
 const cli = path.join(projectRoot, "dist/index.js");
@@ -1270,20 +1271,162 @@ test("schema files are valid JSON and expose the versioned public shapes", () =>
 });
 
 test("OpenCode adapter exposes only non-apply tools and proposes terminal apply", () => {
+  const opencodeDir = path.join(projectRoot, "adapters/opencode");
   const toolsDir = path.join(projectRoot, "adapters/opencode/tools");
   const tools = readdirSync(toolsDir).filter((file) => file.endsWith(".js")).sort();
-  assert.deepEqual(tools, ["project_atlas_context.js", "project_atlas_propose.js", "project_atlas_scan.js"]);
+  assert.deepEqual(tools, [
+    "project_atlas_check.js",
+    "project_atlas_context.js",
+    "project_atlas_propose.js",
+    "project_atlas_remember.js",
+    "project_atlas_review_summary.js",
+    "project_atlas_scan.js",
+  ]);
   assert.ok(!tools.some((file) => file.includes("apply")), "adapter must not expose an apply tool");
 
+  const helper = readFileSync(path.join(opencodeDir, "lib/run_project_atlas.js"), "utf8");
+  const checkTool = readFileSync(path.join(toolsDir, "project_atlas_check.js"), "utf8");
   const scanTool = readFileSync(path.join(toolsDir, "project_atlas_scan.js"), "utf8");
   const contextTool = readFileSync(path.join(toolsDir, "project_atlas_context.js"), "utf8");
   const proposeTool = readFileSync(path.join(toolsDir, "project_atlas_propose.js"), "utf8");
+  const rememberTool = readFileSync(path.join(toolsDir, "project_atlas_remember.js"), "utf8");
+  const reviewSummaryTool = readFileSync(path.join(toolsDir, "project_atlas_review_summary.js"), "utf8");
+  assert.match(helper, /spawn\("project-atlas"/);
+  for (const toolText of [checkTool, scanTool, contextTool, proposeTool, rememberTool, reviewSummaryTool]) {
+    assert.match(toolText, /runProjectAtlas/);
+    assert.doesNotMatch(toolText, /from "node:child_process"/);
+  }
+  assert.match(checkTool, /\["check", "--repo"/);
   assert.match(scanTool, /\["scan", "--repo"/);
   assert.match(contextTool, /\["context", "--repo"/);
+  assert.match(contextTool, /sourceFile/);
+  assert.match(contextTool, /--source-file/);
+  assert.match(contextTool, /memoryType/);
+  assert.match(contextTool, /--memory-type/);
+  assert.match(contextTool, /topic/);
+  assert.match(contextTool, /scope/);
+  assert.match(contextTool, /format/);
   assert.match(proposeTool, /\["propose", "--repo"/);
-  assert.match(proposeTool, /No apply tool is available/);
-  assert.match(proposeTool, /human must run project-atlas apply in a terminal/i);
-  assert.doesNotMatch(`${scanTool}\n${contextTool}\n${proposeTool}`, /\["apply", "--repo"/);
+  assert.match(rememberTool, /\["remember", "--repo"/);
+  assert.match(rememberTool, /sourceFiles/);
+  assert.match(rememberTool, /memory_type/);
+  assert.match(rememberTool, /replaceExisting/);
+  assert.match(reviewSummaryTool, /\["review-summary", "--repo"/);
+  assert.match(helper, /No apply tool is available/);
+  assert.match(helper, /human must run project-atlas apply in a terminal/i);
+  assert.match(proposeTool, /withHumanApplyMessage/);
+  assert.match(rememberTool, /withHumanApplyMessage/);
+  assert.match(reviewSummaryTool, /reviewSummaryOutput/);
+  assert.doesNotMatch(`${helper}\n${checkTool}\n${scanTool}\n${contextTool}\n${proposeTool}\n${rememberTool}\n${reviewSummaryTool}`, /\["apply", "--repo"/);
+});
+
+test("OpenCode review summary output preserves real failures and only prompts apply when safe", async () => {
+  const { reviewSummaryOutput } = await import(pathToFileURL(path.join(projectRoot, "adapters/opencode/lib/review_summary_output.js")).href);
+
+  assert.equal(
+    reviewSummaryOutput({ stdout: "", stderr: "No proposal found. Run project-atlas propose first.", exitCode: 1 }),
+    "No proposal is waiting for review.",
+  );
+
+  const commandFailure = reviewSummaryOutput({ stdout: "", stderr: "project-atlas: command not found", exitCode: 127 });
+  assert.equal(commandFailure, "project-atlas: command not found");
+  assert.doesNotMatch(commandFailure, /human must run project-atlas apply/i);
+
+  const blockedSummary = [
+    "# Project Atlas Review Summary",
+    "",
+    "- proposal_id: kb-blocked",
+    "",
+    "## Apply Safety",
+    "- can_apply: no",
+    "",
+  ].join("\n");
+  assert.equal(reviewSummaryOutput({ stdout: blockedSummary, stderr: "", exitCode: 0 }), blockedSummary);
+
+  const safeSummary = [
+    "# Project Atlas Review Summary",
+    "",
+    "- proposal_id: kb-safe",
+    "",
+    "## Apply Safety",
+    "- can_apply: yes",
+    "",
+  ].join("\n");
+  assert.match(reviewSummaryOutput({ stdout: safeSummary, stderr: "", exitCode: 0 }), /human must run project-atlas apply in a terminal/i);
+});
+
+test("OpenCode adapter includes kb-generate command with structured generation rules", () => {
+  const commandsDir = path.join(projectRoot, "adapters/opencode/commands");
+  const commands = readdirSync(commandsDir).filter((file) => file.endsWith(".md")).sort();
+  assert.deepEqual(commands, ["kb-check.md", "kb-context.md", "kb-generate.md", "kb-refresh.md", "kb-remember.md", "kb-review.md", "kb-status.md"]);
+
+  const generateCommand = readFileSync(path.join(commandsDir, "kb-generate.md"), "utf8");
+  assert.match(generateCommand, /project_atlas_scan/);
+  assert.match(generateCommand, /mode=full/);
+  assert.match(generateCommand, /project_atlas_propose/);
+  assert.match(generateCommand, /knowledge\/project\/overview\.md/);
+  assert.match(generateCommand, /knowledge\/glossary\.md/);
+  assert.match(generateCommand, /core \+ candidates/i);
+  assert.match(generateCommand, /sourceFiles/);
+  assert.match(generateCommand, /proposal-level/i);
+  assert.match(generateCommand, /source files/i);
+  assert.match(generateCommand, /Do not write frontmatter/i);
+  assert.match(generateCommand, /Do not apply/i);
+  assert.doesNotMatch(generateCommand, /project_atlas_apply/);
+  assert.doesNotMatch(generateCommand, /opencode-kb/);
+
+  const readme = readFileSync(path.join(projectRoot, "adapters/opencode/README.md"), "utf8");
+  assert.match(readme, /\/kb-generate/);
+  assert.match(readme, /first knowledge/i);
+});
+
+test("OpenCode adapter includes kb-check and kb-review workflow commands", () => {
+  const commandsDir = path.join(projectRoot, "adapters/opencode/commands");
+  const checkCommand = readFileSync(path.join(commandsDir, "kb-check.md"), "utf8");
+  const reviewCommand = readFileSync(path.join(commandsDir, "kb-review.md"), "utf8");
+  const statusCommand = readFileSync(path.join(commandsDir, "kb-status.md"), "utf8");
+  const rememberCommand = readFileSync(path.join(commandsDir, "kb-remember.md"), "utf8");
+  const contextCommand = readFileSync(path.join(commandsDir, "kb-context.md"), "utf8");
+  const refreshCommand = readFileSync(path.join(commandsDir, "kb-refresh.md"), "utf8");
+
+  assert.match(checkCommand, /project_atlas_check/);
+  assert.match(checkCommand, /manifest/);
+  assert.match(checkCommand, /stale/i);
+  assert.match(checkCommand, /duplicate topic/i);
+  assert.doesNotMatch(checkCommand, /project_atlas_apply/);
+
+  assert.match(reviewCommand, /project_atlas_review_summary/);
+  assert.match(reviewCommand, /latest proposal/i);
+  assert.match(reviewCommand, /No proposal/i);
+  assert.match(reviewCommand, /apply safety/i);
+  assert.match(reviewCommand, /human/i);
+  assert.doesNotMatch(reviewCommand, /project_atlas_apply/);
+
+  assert.match(statusCommand, /project_atlas_check/);
+  assert.match(statusCommand, /project_atlas_review_summary/);
+  assert.match(statusCommand, /当前没有待 review proposal/);
+  assert.doesNotMatch(statusCommand, /project_atlas_apply/);
+
+  assert.match(rememberCommand, /project_atlas_remember/);
+  assert.match(rememberCommand, /sourceFiles/);
+  assert.match(rememberCommand, /memory type/i);
+  assert.match(rememberCommand, /proposal/);
+  assert.match(rememberCommand, /human/i);
+  assert.doesNotMatch(rememberCommand, /project_atlas_apply/);
+
+  assert.match(contextCommand, /query/);
+  assert.match(contextCommand, /source file/i);
+  assert.match(contextCommand, /memory type/i);
+  assert.match(refreshCommand, /sourceFiles/);
+  assert.match(refreshCommand, /No stable knowledge changes/i);
+  assert.match(refreshCommand, /Do not write generic summaries/i);
+
+  const readme = readFileSync(path.join(projectRoot, "adapters/opencode/README.md"), "utf8");
+  assert.match(readme, /\/kb-generate[\s\S]*\/kb-check[\s\S]*\/kb-review/);
+  assert.match(readme, /\/kb-refresh[\s\S]*\/kb-check[\s\S]*\/kb-review/);
+  assert.match(readme, /\/kb-status/);
+  assert.match(readme, /\/kb-remember/);
+  assert.doesNotMatch(readme, /\/kb-complete/);
 });
 
 test("ecosystem adapter docs expose only safe MCP or CLI entrypoints", () => {

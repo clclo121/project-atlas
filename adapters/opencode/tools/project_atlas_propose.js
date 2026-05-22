@@ -1,25 +1,8 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import { tool } from "@opencode-ai/plugin";
-
-function run(command, args, cwd, abort) {
-  return new Promise((resolve) => {
-    const child = spawn(command, args, { cwd, shell: false, env: process.env });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-    abort?.addEventListener("abort", () => child.kill("SIGTERM"), { once: true });
-    child.on("error", (error) => resolve({ stdout, stderr: `${stderr}${error.message}`, exitCode: 127 }));
-    child.on("close", (code) => resolve({ stdout, stderr, exitCode: code ?? 1 }));
-  });
-}
+import { outputText, repoFromContext, runProjectAtlas, withHumanApplyMessage } from "../lib/run_project_atlas.js";
 
 export default tool({
   description: "Create a project-atlas proposal. This tool never applies knowledge changes.",
@@ -36,14 +19,14 @@ export default tool({
     sourceFiles: tool.schema.array(tool.schema.string()).optional().describe("Source evidence files"),
   },
   async execute(args, context) {
-    const repo = context.worktree || context.directory || process.cwd();
+    const repo = repoFromContext(context);
     const dir = await mkdtemp(path.join(tmpdir(), "project-atlas-opencode-"));
     const updatesFile = path.join(dir, "updates.json");
     await writeFile(updatesFile, JSON.stringify({ source_files: args.sourceFiles || [], updates: args.updates }, null, 2), "utf8");
     try {
-      const result = await run("project-atlas", ["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", args.reason], repo, context.abort);
+      const result = await runProjectAtlas(["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", args.reason], repo, context.abort);
       return {
-        output: `${result.stdout || result.stderr}\n\nNo apply tool is available. A human must run project-atlas apply in a terminal.`,
+        output: withHumanApplyMessage(outputText(result)),
         metadata: { repo, exitCode: result.exitCode },
       };
     } finally {
