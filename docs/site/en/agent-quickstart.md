@@ -73,7 +73,23 @@ Before creating a proposal, handing off work, or preparing a release, run:
 project-atlas check --repo "$PWD" --format json
 ```
 
-If the result reports missing sources, stale sources, missing metadata, bad links, or duplicate topics, state the risk in your answer.
+If the result reports missing sources, stale sources, missing metadata, bad links, duplicate topics, or quality warnings, state the risk in your answer. Quality warnings cover shallow content, README-only evidence, and missing practical sections such as responsibilities, entry points, key files, and change notes.
+
+## Scan And External Evidence
+
+Before generating the first knowledge draft, run a full scan:
+
+```bash
+project-atlas scan --repo "$PWD" --mode full --format json
+```
+
+If `code-review-graph`, repo map, or similar tooling is available, use it to summarize code structure, impact radius, key nodes, and test gaps, then import the result as external evidence:
+
+```bash
+project-atlas scan --repo "$PWD" --mode full --external-evidence-file examples/external-evidence/code-review-graph.json --format json
+```
+
+External evidence is optional enrichment, not a runtime dependency. Before importing it, confirm that the JSON does not contain secrets, tokens, customer data, or private local paths.
 
 ## Proposals And Memory
 
@@ -100,6 +116,7 @@ Report at least:
 - dry-run summary
 - review decision
 - apply safety
+- quality warnings
 - whether human terminal apply is still required
 
 ## MCP

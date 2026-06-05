@@ -25,6 +25,7 @@
     "dist",
     "adapters",
     "schema",
+    "examples",
     "templates",
     "docs/site",
     "CHANGELOG.md",

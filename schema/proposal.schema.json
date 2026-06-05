@@ -75,6 +75,20 @@
           "content": {
             "type": "string"
           },
+          "source_files": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "source_hashes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^sha256:([a-f0-9]{64}|missing)$"
+            }
+          },
           "target_current_hash": {
             "type": "string",
             "pattern": "^sha256:([a-f0-9]{64}|missing)$"
@@ -94,10 +108,32 @@
       "type": "string",
       "minLength": 1
     },
+    "update_reason_summary": {
+      "type": "string",
+      "minLength": 1
+    },
     "external_evidence": {
       "type": "array",
       "items": {
         "$ref": "external-evidence.schema.json#/$defs/external_evidence_item"
+      }
+    },
+    "evidence_plan_summary": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence_plan_item"
+      }
+    },
+    "quality_score": {
+      "$ref": "#/$defs/quality_score"
+    },
+    "coverage_score": {
+      "$ref": "#/$defs/coverage_score"
+    },
+    "proposal_quality_findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/check_item"
       }
     },
     "sensitive_scan_result": {
@@ -117,6 +153,93 @@
     "applied_at": {
       "type": "string",
       "format": "date-time"
+    }
+  },
+  "$defs": {
+    "evidence_plan_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "candidate_category", "recommended_files", "required_evidence_types", "reason", "missing_evidence", "confidence"],
+      "properties": {
+        "target": { "type": "string", "pattern": "^knowledge/" },
+        "candidate_category": { "type": "string" },
+        "recommended_files": { "type": "array", "items": { "type": "string" } },
+        "required_evidence_types": { "type": "array", "items": { "type": "string" } },
+        "reason": { "type": "string" },
+        "missing_evidence": { "type": "array", "items": { "type": "string" } },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "quality_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "rating", "items"],
+      "properties": {
+        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "rating": { "enum": ["good", "warning", "poor"] },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["target", "score", "deductions"],
+            "properties": {
+              "target": { "type": "string", "pattern": "^knowledge/" },
+              "score": { "type": "number", "minimum": 0, "maximum": 100 },
+              "deductions": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "coverage_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "rating", "items"],
+      "properties": {
+        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "rating": { "enum": ["good", "warning", "poor"] },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["target", "score", "planned_files", "actual_files", "missing_files", "missing_evidence_types", "external_warnings", "deductions"],
+            "properties": {
+              "target": { "type": "string", "pattern": "^knowledge/" },
+              "score": { "type": "number", "minimum": 0, "maximum": 100 },
+              "planned_files": { "type": "array", "items": { "type": "string" } },
+              "actual_files": { "type": "array", "items": { "type": "string" } },
+              "missing_files": { "type": "array", "items": { "type": "string" } },
+              "missing_evidence_types": { "type": "array", "items": { "type": "string" } },
+              "external_warnings": { "type": "array", "items": { "type": "string" } },
+              "deductions": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "check_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "rule_id", "path", "message", "suggestion"],
+      "properties": {
+        "level": {
+          "enum": ["error", "warning"]
+        },
+        "rule_id": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "suggestion": {
+          "type": "string"
+        }
+      }
     }
   }
 }

@@ -38,16 +38,19 @@ server.registerTool(
     inputSchema: z.object({
       repo: z.string().optional().describe("Git repository path. Defaults to the MCP server working directory."),
       mode: z.enum(["full", "changed"]).optional().describe("Scan mode. Defaults to full."),
+      review_depth: z.enum(["standard", "deep"]).optional().describe("Review planning depth. Defaults to standard."),
       external_evidence_file: z.string().optional().describe("JSON file with external repo map or code graph evidence."),
     }),
   },
-  async ({ repo, mode, external_evidence_file }) =>
+  async ({ repo, mode, review_depth, external_evidence_file }) =>
     cliTool([
       "scan",
       "--repo",
       repo || process.cwd(),
       "--mode",
       mode || "full",
+      "--review-depth",
+      review_depth || "standard",
       ...flag("external-evidence-file", external_evidence_file),
     ]),
 );

@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "external_evidence": [
+    {
+      "source": "code-review-graph",
+      "source_type": "code_graph",
+      "path": "src/index.ts",
+      "summary": "CLI entry coordinates user commands and routes them into core proposal, scan, check, and review-summary handlers.",
+      "tool_version": "example",
+      "coverage_summary": "CLI entry and command routing",
+      "confidence": 0.86
+    },
+    {
+      "source": "code-review-graph",
+      "source_type": "impact_analysis",
+      "path": "src/scanner.ts",
+      "summary": "Scanner output influences knowledge candidates, evidence files, sensitive config findings, and generation depth.",
+      "tool_version": "example",
+      "coverage_summary": "scanner candidates and evidence planning",
+      "confidence": 0.84
+    },
+    {
+      "source": "code-review-graph",
+      "source_type": "test_gap",
+      "path": "test/cli.test.mjs",
+      "summary": "CLI tests should cover scan candidate groups, proposal quality warnings, sensitive redaction, and adapter prompt rules.",
+      "tool_version": "example",
+      "coverage_summary": "test coverage gaps",
+      "confidence": 0.8
+    }
+  ]
+}

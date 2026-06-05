@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Added a public scan result schema with enriched candidate metadata and new `contracts` and `quality` candidate groups while keeping legacy candidate groups compatible.
+- Expanded `scan` discovery for TypeScript CLI, MCP, adapters, schemas, docs, tests, build files, external evidence, and sensitive config rules.
+- Added proposal content quality warnings for shallow documents, weak evidence, and missing practical sections.
+- Added a `code-review-graph` external evidence example and updated agent/OpenCode documentation for evidence-driven knowledge generation.
+- Added `scan --format json`, external evidence sensitive-content rejection, per-update proposal evidence, and conservative review-summary apply safety for proposed content warnings.
+- Added scan `facts` and `evidence_plan`, proposal `evidence_plan_summary` and `quality_score`, and external evidence freshness warnings.
+- Added `scan --review-depth deep`, scan `review_plan`, proposal `coverage_score` and `update_reason_summary`, and review-summary Deep Review Coverage apply gating.
+
 ## 0.1.3 - 2026-05-22
 
 - Consolidated the OpenCode-facing docs into a clearer product entry with aligned site navigation and onboarding copy.

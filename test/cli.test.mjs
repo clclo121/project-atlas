@@ -137,8 +137,51 @@ function makeJavaRepo() {
     "spring:\n  application:\n    name: demo-goods\nsecret: should-not-leak\n",
     "utf8",
   );
+  writeFileSync(path.join(repo, ".env"), "API_KEY=demo-api-key-123456\n", "utf8");
+  writeFileSync(path.join(repo, ".npmrc"), "//registry.example.test/:_authToken=npm-secret-token-123456\n", "utf8");
   run("git", ["add", "."], { cwd: repo });
   run("git", ["commit", "-m", "java fixture"], { cwd: repo });
+  return repo;
+}
+
+function makeTypeScriptCliRepo() {
+  const repo = makeRepo();
+  for (const rel of [
+    "src",
+    "schema",
+    "adapters/opencode/commands",
+    "adapters/opencode/tools",
+    "test",
+    "docs",
+  ]) {
+    mkdirSync(path.join(repo, rel), { recursive: true });
+  }
+  writeFileSync(
+    path.join(repo, "package.json"),
+    JSON.stringify(
+      {
+        name: "demo-cli",
+        type: "module",
+        bin: { "demo-cli": "./dist/index.js", "demo-mcp": "./dist/mcp.js" },
+        scripts: { build: "tsc -p tsconfig.json", test: "node --test test/*.test.mjs" },
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+  writeFileSync(path.join(repo, "tsconfig.json"), JSON.stringify({ compilerOptions: { module: "NodeNext" } }, null, 2), "utf8");
+  writeFileSync(path.join(repo, "src/index.ts"), "export function runCli() { return 'cli'; }\n", "utf8");
+  writeFileSync(path.join(repo, "src/core.ts"), "export function propose() { return 'proposal'; }\n", "utf8");
+  writeFileSync(path.join(repo, "src/mcp.ts"), "export function startMcpServer() { return 'mcp'; }\n", "utf8");
+  writeFileSync(path.join(repo, "schema/proposal.schema.json"), JSON.stringify({ schema_version: "1.0" }, null, 2), "utf8");
+  writeFileSync(path.join(repo, "adapters/opencode/README.md"), "# OpenCode Adapter\n\nSafe scan and propose workflow.\n", "utf8");
+  writeFileSync(path.join(repo, "adapters/opencode/commands/kb-generate.md"), "# kb-generate\n\nCall project_atlas_scan.\n", "utf8");
+  writeFileSync(path.join(repo, "adapters/opencode/tools/project_atlas_scan.js"), "export default function scan() {}\n", "utf8");
+  writeFileSync(path.join(repo, "test/cli.test.mjs"), "import test from 'node:test';\ntest('cli', () => {});\n", "utf8");
+  writeFileSync(path.join(repo, "docs/release.md"), "# Release\n\nRun build and test before publish.\n", "utf8");
+  run("git", ["add", "."], { cwd: repo });
+  run("git", ["commit", "-m", "typescript cli fixture"], { cwd: repo });
   return repo;
 }
 
@@ -329,6 +372,10 @@ test("help output and parameter errors are short and actionable", () => {
   assert.equal(proposeHelp.status, 0, `propose help should pass\nstdout:\n${proposeHelp.stdout}\nstderr:\n${proposeHelp.stderr}`);
   assert.match(proposeHelp.stdout, /--inherit-source-metadata/);
 
+  const scanHelp = runProjectKb(["scan", "--help"], { cwd: projectRoot });
+  assert.equal(scanHelp.status, 0, `scan help should pass\nstdout:\n${scanHelp.stdout}\nstderr:\n${scanHelp.stderr}`);
+  assert.match(scanHelp.stdout, /--review-depth/);
+
   const rememberHelp = runProjectKb(["remember", "--help"], { cwd: projectRoot });
   assert.equal(rememberHelp.status, 0, `remember help should pass\nstdout:\n${rememberHelp.stdout}\nstderr:\n${rememberHelp.stderr}`);
   assert.match(rememberHelp.stdout, /--candidate-file/);
@@ -360,6 +407,10 @@ test("help output and parameter errors are short and actionable", () => {
     const invalidFormat = runProjectKb(["context", "--repo", repo, "--format", "xml"], { cwd: repo });
     assert.notEqual(invalidFormat.status, 0, "invalid format should fail");
     assert.match(invalidFormat.stderr, /--format must be markdown or json/);
+
+    const invalidReviewDepth = runProjectKb(["scan", "--repo", repo, "--review-depth", "audit"], { cwd: repo });
+    assert.notEqual(invalidReviewDepth.status, 0, "invalid review depth should fail");
+    assert.match(invalidReviewDepth.stderr, /--review-depth must be standard or deep/);
 
     const invalidBudget = runProjectKb(["context", "--repo", repo, "--budget", "abc"], { cwd: repo });
     assert.notEqual(invalidBudget.status, 0, "invalid budget should fail");
@@ -478,12 +529,24 @@ test("scan reports project shape and redacts sensitive config values", () => {
     assert.equal(full.status, 0, `scan full should pass\nstdout:\n${full.stdout}\nstderr:\n${full.stderr}`);
     const json = JSON.parse(full.stdout);
     assert.equal(json.mode, "full");
+    assert.equal(json.review_depth, "standard");
+    assert.deepEqual(json.review_plan, []);
     assert.equal(json.project.maven.artifactId, "demo-goods");
     assert.ok(json.entries.controller.some((item) => item.path.endsWith("GoodsController.java")));
     assert.ok(json.knowledge.files.includes("knowledge/manifest.json"));
     assert.ok(json.external_evidence && Array.isArray(json.external_evidence));
     assert.ok(json.sensitive_config_findings.some((item) => item.rule_category === "secret"));
+    assert.ok(json.sensitive_config_findings.some((item) => item.path === ".env" && item.rule_id === "builtin.secret.api-key"));
+    assert.ok(json.sensitive_config_findings.some((item) => item.path === ".npmrc" && item.rule_id === "builtin.secret.npm-token"));
     assert.doesNotMatch(full.stdout, /should-not-leak/);
+    assert.doesNotMatch(full.stdout, /demo-api-key-123456/);
+    assert.doesNotMatch(full.stdout, /npm-secret-token-123456/);
+    const formatted = runProjectKb(["scan", "--repo", repo, "--mode", "full", "--format", "json"], { cwd: repo });
+    assert.equal(formatted.status, 0, `scan --format json should pass\nstdout:\n${formatted.stdout}\nstderr:\n${formatted.stderr}`);
+    assert.equal(JSON.parse(formatted.stdout).schema_version, "1.0");
+    const unsupportedFormat = runProjectKb(["scan", "--repo", repo, "--mode", "full", "--format", "markdown"], { cwd: repo });
+    assert.notEqual(unsupportedFormat.status, 0, "scan should reject unsupported formats");
+    assert.match(unsupportedFormat.stderr, /--format must be json/);
 
     writeFileSync(
       path.join(repo, "src/main/java/com/example/service/StoreOwnedGoodsService.java"),
@@ -494,6 +557,56 @@ test("scan reports project shape and redacts sensitive config values", () => {
     assert.equal(changed.status, 0, `scan changed should pass\nstdout:\n${changed.stdout}\nstderr:\n${changed.stderr}`);
     const changedJson = JSON.parse(changed.stdout);
     assert.ok(changedJson.changed_files.includes("src/main/java/com/example/service/StoreOwnedGoodsService.java"));
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("scan reports TypeScript CLI, MCP, adapter, schema, test, and quality candidates", () => {
+  const repo = makeTypeScriptCliRepo();
+  try {
+    initKnowledge(repo);
+    const full = runProjectKb(["scan", "--repo", repo, "--mode", "full", "--review-depth", "deep"], { cwd: repo });
+    assert.equal(full.status, 0, `scan full should pass\nstdout:\n${full.stdout}\nstderr:\n${full.stderr}`);
+    const json = JSON.parse(full.stdout);
+    assert.equal(json.review_depth, "deep");
+    assert.ok(json.entries.cli.some((item) => item.path === "src/index.ts"));
+    assert.ok(json.entries.mcp.some((item) => item.path === "src/mcp.ts"));
+    assert.ok(json.entries.adapter.some((item) => item.path.startsWith("adapters/opencode")));
+    assert.ok(json.entries.commands.some((item) => item.path.endsWith("kb-generate.md")));
+    assert.ok(json.entries.tools.some((item) => item.path.endsWith("project_atlas_scan.js")));
+    assert.ok(json.entries.schema.some((item) => item.path === "schema/proposal.schema.json"));
+    assert.ok(json.entries.tests.some((item) => item.path === "test/cli.test.mjs"));
+    assert.ok(json.entries.build.some((item) => item.path === "package.json"));
+
+    const allCandidates = Object.values(json.candidates).flat();
+    assert.ok(allCandidates.some((item) => item.target === "knowledge/workflows/cli-commands.md"));
+    assert.ok(allCandidates.some((item) => item.target === "knowledge/integrations/mcp-server.md"));
+    assert.ok(allCandidates.some((item) => item.target === "knowledge/integrations/agent-adapters.md"));
+    assert.ok(allCandidates.some((item) => item.target === "knowledge/contracts/data-schemas.md"));
+    assert.ok(allCandidates.some((item) => item.target === "knowledge/quality/test-and-release.md"));
+    assert.ok(json.candidates.contracts.some((item) => item.target === "knowledge/contracts/data-schemas.md"));
+    assert.ok(json.candidates.quality.some((item) => item.target === "knowledge/quality/test-and-release.md"));
+    assert.ok(json.candidates.integrations.some((item) => item.target === "knowledge/contracts/data-schemas.md"), "legacy integrations group should retain schema candidate");
+    assert.ok(json.candidates.risks.some((item) => item.target === "knowledge/quality/test-and-release.md"), "legacy risks group should retain quality candidate");
+    assert.ok(allCandidates.every((item) => item.target && item.reason));
+    assert.ok(allCandidates.some((item) => Array.isArray(item.source_files) && item.source_files.length > 0));
+    assert.ok(allCandidates.some((item) => typeof item.confidence === "number"));
+    assert.ok(allCandidates.some((item) => item.category === "adapter"));
+    assert.equal(json.facts.package_json.name, "demo-cli");
+    assert.ok(json.facts.package_json.bin.includes("demo-cli"));
+    assert.ok(json.facts.package_json.scripts.includes("build"));
+    assert.ok(json.facts.mcp_tools.some((item) => item.name === "startMcpServer" || item.path === "src/mcp.ts"));
+    assert.ok(json.facts.adapter_assets.some((item) => item.type === "adapter_command" && item.path.endsWith("kb-generate.md")));
+    assert.ok(json.facts.adapter_assets.some((item) => item.type === "adapter_tool" && item.path.endsWith("project_atlas_scan.js")));
+    assert.ok(json.facts.schemas.some((item) => item.path === "schema/proposal.schema.json"));
+    assert.ok(json.facts.tests.some((item) => item.path === "test/cli.test.mjs"));
+    assert.ok(json.evidence_plan.some((item) => item.target === "knowledge/workflows/cli-commands.md" && item.recommended_files.includes("src/index.ts")));
+    assert.ok(json.evidence_plan.every((item) => item.required_evidence_types.length > 0));
+    assert.ok(json.review_plan.some((item) => item.target === "knowledge/workflows/cli-commands.md" && item.focus.includes("command contract")));
+    assert.ok(json.review_plan.some((item) => item.required_external_evidence.includes("impact_radius")));
+    assert.ok(json.review_plan.some((item) => item.risk_flags.some((flag) => flag.startsWith("missing_external_evidence:"))));
+    assert.ok(json.review_plan.some((item) => item.related_facts.includes("package:package.json")));
   } finally {
     cleanup(repo);
   }
@@ -511,6 +624,37 @@ test("scan imports external evidence and rejects invalid evidence files", () => 
     assert.equal(payload.external_evidence[0].source, "aider-repo-map");
     assert.equal(payload.external_evidence[0].source_type, "repo_map");
     assert.equal(payload.external_evidence[0].path, "src/main/java/com/example/service/PrecisionOrderService.java");
+    assert.ok(payload.candidates.risks.some((item) => item.target === "knowledge/quality/code-review-graph-evidence.md"));
+    assert.ok(payload.candidates.quality.some((item) => item.target === "knowledge/quality/code-review-graph-evidence.md"));
+    assert.ok(payload.candidates.risks.some((item) => item.category === "external_evidence"));
+    assert.deepEqual(payload.external_evidence_warnings, []);
+
+    const staleEvidence = path.join(repo, "stale-evidence.json");
+    writeFileSync(
+      staleEvidence,
+      JSON.stringify({
+        schema_version: "1.0",
+        external_evidence: [
+          {
+            source: "code-review-graph",
+            source_type: "code_graph",
+            path: "src/main/java/com/example/service/MissingService.java",
+            generated_at: "2020-01-01T00:00:00.000Z",
+            base_commit: "different-commit",
+            tool_version: "test",
+            coverage_summary: "stale fixture",
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const staleEvidenceResult = runProjectKb(["scan", "--repo", repo, "--external-evidence-file", staleEvidence], { cwd: repo });
+    assert.equal(staleEvidenceResult.status, 0, `stale evidence should warn, not fail\nstdout:\n${staleEvidenceResult.stdout}\nstderr:\n${staleEvidenceResult.stderr}`);
+    const stalePayload = JSON.parse(staleEvidenceResult.stdout);
+    const warningRules = stalePayload.external_evidence_warnings.map((item) => item.rule_id);
+    assert.ok(warningRules.includes("external_evidence_missing_path"));
+    assert.ok(warningRules.includes("external_evidence_base_commit_differs"));
+    assert.ok(warningRules.includes("external_evidence_stale"));
 
     const invalidJson = path.join(repo, "invalid-evidence.json");
     writeFileSync(invalidJson, "{bad json", "utf8");
@@ -523,6 +667,27 @@ test("scan imports external evidence and rejects invalid evidence files", () => 
     const missingFieldResult = runProjectKb(["scan", "--repo", repo, "--external-evidence-file", missingField], { cwd: repo });
     assert.notEqual(missingFieldResult.status, 0, "missing evidence fields should fail");
     assert.match(missingFieldResult.stderr, /external_evidence item path is required/);
+
+    const sensitiveEvidence = path.join(repo, "sensitive-evidence.json");
+    writeFileSync(
+      sensitiveEvidence,
+      JSON.stringify({
+        schema_version: "1.0",
+        external_evidence: [
+          {
+            source: "code-review-graph",
+            source_type: "code_graph",
+            path: "src/main/java/com/example/service/PrecisionOrderService.java",
+            summary: "authorization: bearer secret-token-123456",
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const sensitiveEvidenceResult = runProjectKb(["scan", "--repo", repo, "--external-evidence-file", sensitiveEvidence], { cwd: repo });
+    assert.notEqual(sensitiveEvidenceResult.status, 0, "sensitive external evidence should fail");
+    assert.match(sensitiveEvidenceResult.stderr, /external_evidence item summary contains sensitive content: builtin\.secret\.authorization/);
+    assert.doesNotMatch(sensitiveEvidenceResult.stderr, /secret-token-123456/);
   } finally {
     cleanup(repo);
   }
@@ -800,6 +965,7 @@ test("propose creates multi-file evidence and blocks invalid or sensitive update
     const proposal = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals", latest.proposal_id, "proposal.json"), "utf8"));
     assert.equal(proposal.operations.length, 2);
     assert.deepEqual(proposal.source_files, ["README.md"]);
+    assert.deepEqual(proposal.operations[0].source_files, ["README.md"]);
     assert.match(proposal.operations[0].content, /source_hashes:/);
     const proposalSchema = readSchema("proposal.schema.json");
     assertRequiredFields(proposalSchema, [
@@ -905,7 +1071,7 @@ test("propose creates multi-file evidence and blocks invalid or sensitive update
       sensitiveFile,
       JSON.stringify({
         source_files: ["README.md"],
-        updates: [{ target: "knowledge/domains/secret.md", content: "# Secret\n\npassword: secret-value-123456\n" }],
+        updates: [{ target: "knowledge/domains/secret.md", content: "# Secret\n\npassword: secret-value-123456\n\n-----BEGIN PRIVATE KEY-----\nprivate-value\n-----END PRIVATE KEY-----\n" }],
       }),
       "utf8",
     );
@@ -917,6 +1083,59 @@ test("propose creates multi-file evidence and blocks invalid or sensitive update
     assert.equal(blocked.proposal_status, "blocked_sensitive");
     const blockedText = readFileSync(path.join(repo, ".project-atlas/proposals", blocked.proposal_id, "proposal.json"), "utf8");
     assert.doesNotMatch(blockedText, /secret-value-123456/);
+    assert.doesNotMatch(blockedText, /private-value/);
+    const blockedSummary = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals", blocked.proposal_id, "blocked-sensitive-summary.json"), "utf8"));
+    assert.ok(blockedSummary.items.some((item) => item.rule_id === "builtin.secret.password"));
+    assert.ok(blockedSummary.items.some((item) => item.rule_id === "builtin.secret.private-key"));
+    assert.doesNotMatch(JSON.stringify(blockedSummary), /secret-value-123456|private-value/);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("propose supports per-update source files while keeping top-level evidence compatible", () => {
+  const repo = makeRepo();
+  try {
+    initKnowledge(repo);
+    mkdirSync(path.join(repo, "src"), { recursive: true });
+    mkdirSync(path.join(repo, "docs"), { recursive: true });
+    writeFileSync(path.join(repo, "src/order.ts"), "export function orderEntry() { return 'order'; }\n", "utf8");
+    writeFileSync(path.join(repo, "docs/release.md"), "# Release\n\nRun verify before release.\n", "utf8");
+    const updatesFile = path.join(repo, "per-update-sources.json");
+    writeFileSync(
+      updatesFile,
+      JSON.stringify(
+        {
+          source_files: ["README.md"],
+          updates: [
+            {
+              target: "knowledge/domains/order.md",
+              source_files: ["src/order.ts"],
+              content: "# Order Domain\n\n## Responsibilities\n\nThe order domain records stable order entry behavior for the fixture.\n\n## Key Entry Points\n\n- `src/order.ts` exposes the order entry used as source evidence.\n",
+            },
+            {
+              target: "knowledge/quality/release.md",
+              source_files: ["docs/release.md"],
+              content: "# Release Quality\n\n## Responsibilities\n\nRelease quality records the fixture release checks.\n\n## Tests\n\n- `docs/release.md` records the verification expectation.\n",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    const proposed = runProjectKb(["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", "per update evidence"], { cwd: repo });
+    assert.equal(proposed.status, 0, `per-update proposal should pass\nstdout:\n${proposed.stdout}\nstderr:\n${proposed.stderr}`);
+    const latest = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals/latest.json"), "utf8"));
+    const proposal = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals", latest.proposal_id, "proposal.json"), "utf8"));
+    assert.deepEqual(proposal.source_files, ["src/order.ts", "docs/release.md"]);
+    assert.deepEqual(proposal.operations[0].source_files, ["src/order.ts"]);
+    assert.deepEqual(proposal.operations[1].source_files, ["docs/release.md"]);
+    assert.match(proposal.operations[0].content, /source_files:\n  - src\/order\.ts/);
+    assert.doesNotMatch(proposal.operations[0].content, /docs\/release\.md/);
+    assert.match(proposal.operations[1].content, /source_files:\n  - docs\/release\.md/);
+    assert.doesNotMatch(proposal.operations[1].content, /src\/order\.ts/);
   } finally {
     cleanup(repo);
   }
@@ -1404,6 +1623,7 @@ test("schema files are valid JSON and expose the versioned public shapes", () =>
     "manifest.schema.json",
     "memory-candidate.schema.json",
     "proposal.schema.json",
+    "scan-result.schema.json",
     "trigger-result.schema.json",
   ]);
   for (const file of schemaFiles) {
@@ -1420,9 +1640,35 @@ test("schema files are valid JSON and expose the versioned public shapes", () =>
     assert.ok(itemSchema.required.includes(field), `${field} should be required on external evidence items`);
     assert.ok(itemSchema.properties[field], `${field} should have an item schema property`);
   }
+  for (const field of ["generated_at", "base_commit", "tool_version", "coverage_summary"]) {
+    assert.ok(itemSchema.properties[field], `${field} should have an item schema property`);
+  }
   const proposalSchema = readSchema("proposal.schema.json");
   assert.ok(proposalSchema.properties.external_evidence, "proposal schema should include external_evidence");
+    assert.ok(proposalSchema.properties.evidence_plan_summary, "proposal schema should include evidence_plan_summary");
+    assert.ok(proposalSchema.properties.quality_score, "proposal schema should include quality_score");
+    assert.ok(proposalSchema.properties.coverage_score, "proposal schema should include coverage_score");
+    assert.ok(proposalSchema.properties.update_reason_summary, "proposal schema should include update_reason_summary");
+    assert.ok(proposalSchema.properties.proposal_quality_findings, "proposal schema should include proposal_quality_findings");
+  assert.ok(proposalSchema.properties.operations.items.properties.source_files, "proposal operations should include source_files");
+  assert.ok(proposalSchema.properties.operations.items.properties.source_hashes, "proposal operations should include source_hashes");
   assert.ok(proposalSchema.required.includes("source_hashes"), "proposal schema should require source hash snapshots");
+
+  const scanResultSchema = readSchema("scan-result.schema.json");
+  assertRequiredFields(scanResultSchema, ["schema_version", "mode", "review_depth", "repo", "entries", "facts", "candidates", "evidence_plan", "review_plan", "external_evidence"]);
+  const candidateSchema = scanResultSchema.$defs.candidate;
+  assert.ok(candidateSchema.required.includes("target"));
+  assert.ok(candidateSchema.required.includes("reason"));
+  assert.ok(candidateSchema.properties.source_files);
+  assert.ok(candidateSchema.properties.confidence);
+  assert.ok(candidateSchema.properties.category);
+  assert.ok(candidateSchema.properties.fact_ids);
+  assert.ok(scanResultSchema.properties.facts.properties.package_json);
+  assert.ok(scanResultSchema.properties.evidence_plan);
+  assert.ok(scanResultSchema.properties.review_plan);
+  assert.ok(scanResultSchema.properties.external_evidence_warnings);
+  assert.ok(scanResultSchema.properties.candidates.properties.contracts);
+  assert.ok(scanResultSchema.properties.candidates.properties.quality);
 
   const memoryCandidateSchema = readSchema("memory-candidate.schema.json");
   assertRequiredFields(memoryCandidateSchema, ["schema_version", "source_files", "memories"]);
@@ -1466,6 +1712,10 @@ test("OpenCode adapter exposes only non-apply tools and proposes terminal apply"
   }
   assert.match(checkTool, /\["check", "--repo"/);
   assert.match(scanTool, /\["scan", "--repo"/);
+  assert.match(scanTool, /reviewDepth/);
+  assert.match(scanTool, /--review-depth/);
+  assert.match(scanTool, /externalEvidenceFile/);
+  assert.match(scanTool, /--external-evidence-file/);
   assert.match(contextTool, /\["context", "--repo"/);
   assert.match(contextTool, /sourceFile/);
   assert.match(contextTool, /--source-file/);
@@ -1542,6 +1792,13 @@ test("OpenCode adapter includes kb-generate command with structured generation r
   const generateCommand = readFileSync(path.join(commandsDir, "kb-generate.md"), "utf8");
   assert.match(generateCommand, /project_atlas_scan/);
   assert.match(generateCommand, /mode=full/);
+  assert.match(generateCommand, /reviewDepth=deep/);
+  assert.match(generateCommand, /code-review-graph/);
+  assert.match(generateCommand, /externalEvidenceFile/);
+  assert.match(generateCommand, /evidence reading plan/i);
+  assert.match(generateCommand, /scan\.review_plan/);
+  assert.match(generateCommand, /Deep Review Coverage/);
+  assert.match(generateCommand, /update_reason_summary/);
   assert.match(generateCommand, /project_atlas_propose/);
   assert.match(generateCommand, /knowledge\/project\/overview\.md/);
   assert.match(generateCommand, /knowledge\/glossary\.md/);
@@ -1552,6 +1809,7 @@ test("OpenCode adapter includes kb-generate command with structured generation r
   assert.match(generateCommand, /updatesFile/);
   assert.match(generateCommand, /contentFile/);
   assert.match(generateCommand, /Long Markdown content/i);
+  assert.match(generateCommand, /avoid shallow documents/i);
   assert.match(generateCommand, /Do not write frontmatter/i);
   assert.match(generateCommand, /Do not apply/i);
   assert.doesNotMatch(generateCommand, /project_atlas_apply/);
@@ -1611,11 +1869,19 @@ test("OpenCode adapter includes kb-check and kb-review workflow commands", () =>
   assert.match(contextCommand, /source file/i);
   assert.match(contextCommand, /memory type/i);
   assert.match(refreshCommand, /sourceFiles/);
+  assert.match(refreshCommand, /reviewDepth=deep/);
+  assert.match(refreshCommand, /scan\.review_plan/);
+  assert.match(refreshCommand, /code-review-graph/);
+  assert.match(refreshCommand, /externalEvidenceFile/);
+  assert.match(refreshCommand, /evidence reading plan/i);
+  assert.match(refreshCommand, /update_reason_summary/);
+  assert.match(refreshCommand, /Deep Review Coverage/);
   assert.match(refreshCommand, /updatesFile/);
   assert.match(refreshCommand, /contentFile/);
   assert.match(refreshCommand, /Long Markdown content/i);
   assert.match(refreshCommand, /No stable knowledge changes/i);
   assert.match(refreshCommand, /Do not write generic summaries/i);
+  assert.match(refreshCommand, /avoid shallow documents/i);
 
   const readme = readFileSync(path.join(projectRoot, "adapters/opencode/README.md"), "utf8");
   assert.match(readme, /\/kb-generate[\s\S]*\/kb-check[\s\S]*\/kb-review/);
@@ -1625,8 +1891,17 @@ test("OpenCode adapter includes kb-check and kb-review workflow commands", () =>
   assert.match(readme, /Long Markdown content/i);
   assert.match(readme, /updatesFile/);
   assert.match(readme, /contentFile/);
+  assert.match(readme, /Evidence-Driven Generation/);
+  assert.match(readme, /code-review-graph/);
+  assert.match(readme, /quality warnings/);
   assert.match(readme, /project-atlas apply/);
   assert.doesNotMatch(readme, /\/kb-complete/);
+
+  const zhReadme = readFileSync(path.join(projectRoot, "adapters/opencode/README.zh-CN.md"), "utf8");
+  assert.match(zhReadme, /证据驱动生成/);
+  assert.match(zhReadme, /code-review-graph/);
+  assert.match(zhReadme, /quality warnings/);
+  assert.doesNotMatch(zhReadme, /project_atlas_apply/);
 });
 
 test("ecosystem adapter docs expose only safe MCP or CLI entrypoints", () => {
@@ -1772,9 +2047,14 @@ test("P3 governance assets define docs site, CI matrix, and release scripts", ()
   assert.match(readme, /docs\/site\/en\/README\.md/);
   assert.match(readme, /docs\/site\/quick-start\.md/);
   assert.match(readme, /docs\/site\/en\/quick-start\.md/);
+  assert.ok(packageJson.files.includes("schema"), "npm package should include schema files for reviewers and tooling");
+  assert.ok(packageJson.files.includes("examples"), "npm package should include external evidence examples");
   assert.ok(packageJson.files.includes("docs/site"), "npm package should include docs/site because README links to it");
   assert.ok(packageJson.files.includes("CONTRIBUTING.md"), "npm package should include contributing guidance");
   assert.ok(packageJson.files.includes("SECURITY.md"), "npm package should include security policy");
+  const graphEvidenceExample = JSON.parse(readFileSync(path.join(projectRoot, "examples/external-evidence/code-review-graph.json"), "utf8"));
+  assert.equal(graphEvidenceExample.schema_version, "1.0");
+  assert.ok(graphEvidenceExample.external_evidence.some((item) => item.source === "code-review-graph" && item.source_type === "code_graph"));
 
   const siteOpenCodeLinks = [
     path.join(projectRoot, "docs/site/quick-start.md"),
@@ -1915,6 +2195,81 @@ test("check reports project knowledge health issues in markdown and json", () =>
   }
 });
 
+test("check reports shallow knowledge warnings without failing health", () => {
+  const repo = makeRepo();
+  try {
+    initKnowledge(repo);
+    mkdirSync(path.join(repo, "src"), { recursive: true });
+    mkdirSync(path.join(repo, "knowledge/domains"), { recursive: true });
+    mkdirSync(path.join(repo, "knowledge/workflows"), { recursive: true });
+    writeFileSync(path.join(repo, "src/order.ts"), "export function createOrder() { return 'created'; }\n", "utf8");
+    const readmeHash = runProjectKb(["hash", "--repo", repo, "--path", "README.md"], { cwd: repo }).stdout.trim();
+    const sourceHash = runProjectKb(["hash", "--repo", repo, "--path", "src/order.ts"], { cwd: repo }).stdout.trim();
+    writeFileSync(
+      path.join(repo, "knowledge/domains/shallow.md"),
+      [
+        "---",
+        "kb_schema: 1",
+        "source_files:",
+        "  - README.md",
+        "source_hashes:",
+        `  README.md: ${readmeHash}`,
+        "generated_by: project-atlas",
+        "review_status: draft",
+        "---",
+        "# Shallow",
+        "",
+        "Short note.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    writeFileSync(
+      path.join(repo, "knowledge/workflows/order-flow.md"),
+      [
+        "---",
+        "kb_schema: 1",
+        "source_files:",
+        "  - README.md",
+        "  - src/order.ts",
+        "source_hashes:",
+        `  README.md: ${readmeHash}`,
+        `  src/order.ts: ${sourceHash}`,
+        "generated_by: project-atlas",
+        "review_status: draft",
+        "---",
+        "# Order Flow",
+        "",
+        "## Responsibilities",
+        "",
+        "This document records the stable order creation workflow and keeps the source evidence tied to the CLI fixture.",
+        "",
+        "## Key Entry Points",
+        "",
+        "- `src/order.ts` exposes the order creation function used by this fixture.",
+        "",
+        "## Tests",
+        "",
+        "Use the repository test command after changing this workflow because the knowledge file depends on executable source behavior.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = runProjectKb(["check", "--repo", repo, "--format", "json"], { cwd: repo });
+    assert.equal(result.status, 0, `check should pass\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.ok, true, "warnings should not fail health");
+    const shallowRules = payload.items.filter((item) => item.path === "knowledge/domains/shallow.md").map((item) => item.rule_id);
+    assert.ok(shallowRules.includes("shallow_document"));
+    assert.ok(shallowRules.includes("weak_evidence"));
+    assert.ok(shallowRules.includes("missing_practical_sections"));
+    assert.ok(!payload.items.some((item) => item.path === "knowledge/workflows/order-flow.md" && ["shallow_document", "weak_evidence", "missing_practical_sections"].includes(item.rule_id)));
+  } finally {
+    cleanup(repo);
+  }
+});
+
 test("review-summary gives reviewer-friendly markdown evidence", () => {
   const repo = makeRepo();
   try {
@@ -1924,24 +2279,51 @@ test("review-summary gives reviewer-friendly markdown evidence", () => {
       updatesFile,
       JSON.stringify({
         source_files: ["README.md"],
+        update_reason_summary: "README changed the durable order-domain knowledge boundary.",
         updates: [{ target: "knowledge/domains/order.md", content: "# 订单域\n\n记录订单规则。\n" }],
       }),
       "utf8",
     );
     const proposed = runProjectKb(["propose", "--repo", repo, "--updates-file", updatesFile, "--reason", "review summary 测试"], { cwd: repo });
     assert.equal(proposed.status, 0, `propose should pass\nstdout:\n${proposed.stdout}\nstderr:\n${proposed.stderr}`);
+    const latest = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals/latest.json"), "utf8"));
+    const proposal = JSON.parse(readFileSync(path.join(repo, ".project-atlas/proposals", latest.proposal_id, "proposal.json"), "utf8"));
+    assert.ok(proposal.proposal_quality_findings.some((item) => item.path === "knowledge/domains/order.md" && item.rule_id === "shallow_document"));
+    assert.ok(proposal.proposal_quality_findings.some((item) => item.path === "knowledge/domains/order.md" && item.rule_id === "weak_evidence"));
+    assert.equal(proposal.quality_score.rating, "poor");
+    assert.ok(proposal.quality_score.score < 70);
+    assert.equal(proposal.coverage_score.rating, "poor");
+    assert.ok(proposal.coverage_score.score < 70);
+    assert.equal(proposal.update_reason_summary, "README changed the durable order-domain knowledge boundary.");
+    assert.ok(proposal.evidence_plan_summary.some((item) => item.target === "knowledge/domains/order.md" && item.recommended_files.includes("README.md")));
     const summary = runProjectKb(["review-summary", "--repo", repo], { cwd: repo });
     assert.equal(summary.status, 0, `review summary should pass\nstdout:\n${summary.stdout}\nstderr:\n${summary.stderr}`);
     assert.match(summary.stdout, /# Project Atlas Review Summary/);
     assert.match(summary.stdout, /review summary 测试/);
+    assert.match(summary.stdout, /update_reason_summary: README changed/);
     assert.match(summary.stdout, /README.md/);
     assert.match(summary.stdout, /knowledge\/domains\/order.md/);
     assert.match(summary.stdout, /stale/i);
+    assert.match(summary.stdout, /## External Evidence Warnings/);
+    assert.match(summary.stdout, /## Evidence Plan Coverage/);
+    assert.match(summary.stdout, /## Quality Score/);
+    assert.match(summary.stdout, /overall: [0-9]+/);
+    assert.match(summary.stdout, /## Deep Review Coverage/);
+    assert.match(summary.stdout, /missing_evidence=tests/);
     assert.match(summary.stdout, /## Dry Run Summary/);
+    assert.match(summary.stdout, /## Quality Warnings/);
+    assert.match(summary.stdout, /## Proposed Content Warnings/);
+    assert.match(summary.stdout, /knowledge\/domains\/order.md: shallow_document/);
+    assert.match(summary.stdout, /quality_warnings: yes/);
+    assert.match(summary.stdout, /proposed_content_warnings: yes/);
+    assert.match(summary.stdout, /low_quality_score: yes/);
+    assert.match(summary.stdout, /low_coverage_score: yes/);
     assert.match(summary.stdout, /## Review Decision/);
     assert.match(summary.stdout, /## Apply Safety/);
-    assert.match(summary.stdout, /can_apply: yes/);
-    assert.match(summary.stdout, /project-atlas apply/);
+    assert.match(summary.stdout, /can_apply: no/);
+    assert.match(summary.stdout, /proposed content has quality warnings/);
+    assert.match(summary.stdout, /Resolve proposed content warnings/);
+    assert.doesNotMatch(summary.stdout, /project-atlas apply --repo/);
   } finally {
     cleanup(repo);
   }

@@ -1,10 +1,12 @@
 export type ProposalStatus = "proposed" | "blocked_sensitive" | "applied";
 export type OutputFormat = "markdown" | "json";
 export type MemoryType = "decision" | "experience" | "project_fact";
+export type ReviewDepth = "standard" | "deep";
 
 export interface ScanResult {
   schema_version: string;
   mode: "full" | "changed";
+  review_depth: ReviewDepth;
   repo: string;
   base_commit: string;
   worktree_diff_hash: string;
@@ -20,14 +22,20 @@ export interface ScanResult {
     files: string[];
     empty_sections: string[];
   };
+  facts: ProjectFacts;
   candidates: {
     domains: Candidate[];
     workflows: Candidate[];
     integrations: Candidate[];
     risks: Candidate[];
+    contracts?: Candidate[];
+    quality?: Candidate[];
   };
+  evidence_plan: EvidencePlanItem[];
+  review_plan: ReviewPlanItem[];
   sensitive_config_findings: SensitiveFinding[];
   external_evidence: ExternalEvidenceItem[];
+  external_evidence_warnings?: CheckItem[];
 }
 
 export interface PomInfo {
@@ -41,6 +49,54 @@ export interface PomInfo {
 export interface Candidate {
   target: string;
   reason: string;
+  source_files?: string[];
+  confidence?: number;
+  category?: string;
+  fact_ids?: string[];
+}
+
+export interface ProjectFacts {
+  package_json?: {
+    path: string;
+    name?: string;
+    bin: string[];
+    scripts: string[];
+    files: string[];
+    exports: string[];
+  };
+  mcp_tools: FactItem[];
+  adapter_assets: FactItem[];
+  schemas: FactItem[];
+  tests: FactItem[];
+}
+
+export interface FactItem {
+  id: string;
+  type: string;
+  path: string;
+  name: string;
+  summary?: string;
+}
+
+export interface EvidencePlanItem {
+  target: string;
+  candidate_category: string;
+  recommended_files: string[];
+  required_evidence_types: string[];
+  reason: string;
+  missing_evidence: string[];
+  confidence: number;
+}
+
+export interface ReviewPlanItem {
+  target: string;
+  review_depth: "deep";
+  focus: string[];
+  required_external_evidence: string[];
+  risk_flags: string[];
+  related_facts: string[];
+  recommended_files: string[];
+  confidence: number;
 }
 
 export interface SensitiveFinding {
@@ -58,12 +114,18 @@ export interface ExternalEvidenceItem {
   summary?: string;
   locator?: string;
   confidence?: number;
+  generated_at?: string;
+  base_commit?: string;
+  tool_version?: string;
+  coverage_summary?: string;
 }
 
 export interface ProposalOperation {
   type: "replace_file";
   path: string;
   content: string;
+  source_files?: string[];
+  source_hashes?: Record<string, string>;
   target_current_hash: string;
 }
 
@@ -79,12 +141,46 @@ export interface Proposal {
   created_at: string;
   expires_at: string;
   reason: string;
+  update_reason_summary?: string;
   external_evidence: ExternalEvidenceItem[];
+  evidence_plan_summary?: EvidencePlanItem[];
+  quality_score?: QualityScore;
+  coverage_score?: CoverageScore;
+  proposal_quality_findings?: CheckItem[];
   sensitive_scan_result: "passed" | "blocked";
   proposal_status: ProposalStatus;
   proposal_hash: string;
   applied_hash?: string;
   applied_at?: string;
+}
+
+export interface QualityScore {
+  score: number;
+  rating: "good" | "warning" | "poor";
+  items: QualityScoreItem[];
+}
+
+export interface QualityScoreItem {
+  target: string;
+  score: number;
+  deductions: string[];
+}
+
+export interface CoverageScore {
+  score: number;
+  rating: "good" | "warning" | "poor";
+  items: CoverageScoreItem[];
+}
+
+export interface CoverageScoreItem {
+  target: string;
+  score: number;
+  planned_files: string[];
+  actual_files: string[];
+  missing_files: string[];
+  missing_evidence_types: string[];
+  external_warnings: string[];
+  deductions: string[];
 }
 
 export interface LatestIndex {

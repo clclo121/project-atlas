@@ -26,7 +26,7 @@ Agents may not:
 
 ## How Is Sensitive Content Handled
 
-Configuration scanning reports rule types and file paths, not real values.
+Configuration scanning reports rule types and file paths, not real values. Current rules cover passwords, tokens, API keys, access keys, authorization headers, cookies, npm tokens, private keys, and data source URLs that include credentials.
 
 If a proposal hits a sensitive rule, its status becomes `blocked_sensitive`, and the sensitive raw value is not saved.
 
@@ -34,7 +34,11 @@ If a proposal hits a sensitive rule, its status becomes `blocked_sensitive`, and
 
 `external_evidence` stores structured summaries from external tools. It does not automatically run Serena, Aider Repo Map, or other graph tools at runtime.
 
-Before importing external evidence, the team still needs to confirm that the JSON file does not contain secrets, tokens, passwords, or customer-sensitive data.
+When importing external evidence, Project Atlas scans `source`, `source_type`, `path`, `symbol`, `summary`, and `locator` for common sensitive content. If a rule matches, import fails and the error reports only the field and rule, not the raw value.
+
+The team still needs to confirm that the JSON file does not contain customer-sensitive data or private local paths that should not be shared.
+
+When using `code-review-graph`, import structure, key nodes, impact radius, test gaps, and risk summaries only. Do not import full source snippets, secrets, customer data, or private local paths.
 
 ## Does MCP Introduce Write Risk
 

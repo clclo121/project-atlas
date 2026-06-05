@@ -219,19 +219,82 @@
 当前状态：
 
 - `scan` 支持通过 `--external-evidence-file` 导入 `external_evidence`。
+- `scan` 支持显式 `--format json`，默认仍输出 JSON。
+- `scan` 已输出 `facts` 和 `evidence_plan`，让 Agent 按目标知识文件读取证据。
+- `scan` 会对 external evidence 的路径、`base_commit` 和 `generated_at` 输出 warning。
+- `scan` 支持 `--review-depth standard|deep`，deep 模式输出 `review_plan`。
 - `propose` 支持从 `updates-file` 和 `--external-evidence-file` 合并外部证据。
+- `propose` 会保存 `evidence_plan_summary`、`quality_score`、`coverage_score` 和 `update_reason_summary`，供 review-summary 审核。
+- 已补充 `examples/external-evidence/code-review-graph.json`，用于展示 code-review-graph 风格证据如何进入 Project Atlas。
 - 未把 Serena、Codebase-Memory 或 Aider Repo Map 作为硬依赖。
 
 完成内容：
 
 - 设计 `external_evidence` 标准结构。
 - 支持从外部 JSON 文件导入代码图谱或 repo map 结果。
+- 支持 external evidence 的 `generated_at`、`base_commit`、`tool_version` 和 `coverage_summary`。
+- 支持 deep review 计划中识别缺少的外部证据类型，例如 `architecture_overview`、`impact_radius` 和 `test_gap`。
 - 不把外部工具作为硬依赖。
 
 验收标准：
 
 - 没有外部工具时仍可正常使用。
 - 有外部证据时，proposal 和 review summary 能引用来源。
+
+## 知识库生成深度优化（已完成）
+
+完成状态：
+
+- 2026-06-05 已补齐扫描结构、候选分组、质量 warning、外部证据示例和 OpenCode 生成提示。
+- 详细实现记录见 `docs/development-log/2026-06-05-kb-generation-depth.md`。
+
+### 17. 扫描结构和候选分组
+
+当前状态：
+
+- `scan` 继续保留 Java controller、service、feign、tasks、mq、remote、config 识别。
+- 新增 TypeScript CLI、MCP、adapter、commands、tools、schema、docs、tests 和 build/config 识别。
+- `ScanResult.candidates` 保留 `domains`、`workflows`、`integrations`、`risks`，并新增 `contracts`、`quality`。
+- `ScanResult.facts` 固化 package、MCP、adapter、schema 和 test 事实。
+- `ScanResult.evidence_plan` 固化每个候选目标的推荐证据和缺口。
+- `ScanResult.review_plan` 在 deep 模式下固化审查重点、缺少的外部证据、风险标记和关联事实。
+- 新增 `schema/scan-result.schema.json` 固化公开输出结构。
+
+验收标准：
+
+- TypeScript CLI 仓库可以识别 CLI、MCP、schema、adapter、test、docs 和 build 资产。
+- Java fixture 的原有入口识别不回退。
+- 旧调用方读取 `integrations` 和 `risks` 仍然兼容。
+
+### 18. 生成内容质量门槛
+
+当前状态：
+
+- `check` 输出 `shallow_document`、`weak_evidence`、`missing_practical_sections` warning。
+- `propose` 会把拟生成内容的质量 warning 写入 `proposal_quality_findings`。
+- `propose` 会为 proposal 写入 `quality_score`。
+- `propose` 会为 proposal 写入 `coverage_score` 和 `update_reason_summary`。
+- `review-summary` 展示当前知识库、拟生成内容、质量分、证据计划覆盖和 Deep Review Coverage；拟生成内容存在 warning、质量分低于 70 或覆盖分低于 70 时，`can_apply` 为 `no`。
+
+验收标准：
+
+- warning 不阻断健康检查和人工 apply。
+- reviewer 能在 apply 前看到浅内容、弱证据和缺少实用章节的问题，且 review-summary 不再推荐直接 apply。
+
+### 19. 敏感扫描扩展
+
+当前状态：
+
+- 配置扫描和 proposal 敏感内容检测覆盖 password、token、api key、access key、authorization、cookie、npm token、private key 和带账号密码的数据源 URL。
+- external evidence 导入时也会扫描敏感内容。
+- scanner、proposal 和 external evidence 复用同一套敏感规则。
+- 命中敏感内容时只保存规则、路径和动作，不保存原文。
+
+验收标准：
+
+- `.env`、`.npmrc` 和常见配置文件能输出脱敏风险摘要。
+- proposal 命中敏感规则时保持 `blocked_sensitive`。
+- external evidence 命中敏感规则时拒绝导入，且错误不包含敏感原文。
 
 ## P3 产品体验和治理（已完成）
 

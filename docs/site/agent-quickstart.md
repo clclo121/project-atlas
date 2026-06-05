@@ -73,7 +73,23 @@ project-atlas context --repo "$PWD" --memory-type decision --topic "<topic>" --s
 project-atlas check --repo "$PWD" --format json
 ```
 
-如果结果里出现 missing sources、stale sources、missing metadata、bad links 或 duplicate topics，要在回答里明确说出风险。
+如果结果里出现 missing sources、stale sources、missing metadata、bad links、duplicate topics 或质量 warning，要在回答里明确说出风险。质量 warning 包括浅内容、只有 README 证据、缺少职责/入口/关键文件/变更注意点等实用章节。
+
+## 扫描和外部证据
+
+首次生成知识库前，先运行 full scan：
+
+```bash
+project-atlas scan --repo "$PWD" --mode full --format json
+```
+
+如果当前环境有 `code-review-graph`、repo map 或类似工具，可以先让它输出代码结构、影响半径、关键节点和测试缺口摘要，再作为外部证据导入：
+
+```bash
+project-atlas scan --repo "$PWD" --mode full --external-evidence-file examples/external-evidence/code-review-graph.json --format json
+```
+
+外部证据是增强项，不是硬依赖。导入前要确认 JSON 里没有密钥、token、客户数据或本机私有路径。
 
 ## proposal 和 memory
 
@@ -100,6 +116,7 @@ project-atlas review-summary --repo "$PWD"
 - dry-run summary
 - review decision
 - apply safety
+- quality warnings
 - 是否仍然需要人工终端 apply
 
 ## MCP 工具范围

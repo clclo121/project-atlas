@@ -26,7 +26,7 @@ agent 不能做的事：
 
 ## 敏感内容怎么处理
 
-扫描配置时，只输出规则类型和文件路径，不输出真实值。
+扫描配置时，只输出规则类型和文件路径，不输出真实值。当前规则覆盖 password、token、api key、access key、authorization、cookie、npm token、private key 和带账号密码的数据源 URL。
 
 如果 proposal 命中敏感规则，状态会变成 `blocked_sensitive`，并且不会保存敏感原文。
 
@@ -34,7 +34,11 @@ agent 不能做的事：
 
 `external_evidence` 只保存外部工具给出的结构化摘要。它不会在运行时自动调用 Serena、Aider Repo Map 或其他图谱工具。
 
-导入外部证据前，团队仍然要确认 JSON 文件里没有密钥、token、密码和客户敏感数据。
+导入外部证据时，Project Atlas 会扫描 `source`、`source_type`、`path`、`symbol`、`summary` 和 `locator` 字段里的常见敏感内容。命中规则时会拒绝导入，并且错误信息只包含字段名和规则，不输出原文。
+
+团队仍然要确认 JSON 文件里没有客户敏感数据和不适合共享的本机私有路径。
+
+如果使用 `code-review-graph`，建议只导入结构、关键节点、影响半径、测试缺口和风险摘要，不导入完整源码片段、密钥、客户数据或本机私有路径。
 
 ## MCP 有写入风险吗
 

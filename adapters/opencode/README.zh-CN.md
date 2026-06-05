@@ -92,6 +92,14 @@ adapters/opencode/skills
 project-atlas propose --repo <repo> --updates-file updates.json --reason "<原因>" --inherit-source-metadata
 ```
 
+### 证据驱动生成
+
+`/kb-generate` 和 `/kb-refresh` 会先跑带 deep review 计划的 `project_atlas_scan`，再优先使用 `scan.evidence_plan` 作为读取计划，用 `scan.review_plan` 作为审查清单。可以用 `scan.facts`、候选 `source_files` 和 external evidence 补齐缺口。优先读取 README、package/build 配置、CLI 入口、MCP 入口、adapter 命令和工具、schema、核心实现、测试，以及 evidence plan 或 review plan 里列出的关键文件。
+
+如果当前环境有 `code-review-graph` 或类似代码图谱工具，可以先生成结构、影响半径、关键节点和测试缺口摘要，再通过 `project_atlas_scan` 的 `externalEvidenceFile` 导入。它只是增强证据，不是硬依赖。
+
+生成后要重点看 `/kb-review` 的 `Quality Score`、`Evidence Plan Coverage`、`Deep Review Coverage`、external evidence warnings 和 quality warnings。浅内容、只有 README 证据、质量分或覆盖分低、缺少职责/入口/关键文件/变更注意点等结构时，不建议直接人工 apply。
+
 ### 沉淀决策、经验和项目事实
 
 当任务产出了稳定信息，不适合塞进普通 domain 文档时，使用：
@@ -184,6 +192,6 @@ adapters/opencode/skills
 - 运行 `/kb-status`，确认能同时输出知识健康状态和 latest proposal 状态
 - 运行 `/kb-remember`，确认只创建 proposal
 - 确认 `/kb-generate` 不会直接写 `knowledge/**`，也不会暴露 apply
-- 确认不存在 `project_atlas_apply` tool
+- 确认不存在任何 OpenCode apply tool
 - 确认输出会提示用户回到终端执行 `project-atlas apply`
 - 确认批量 apply 只作为终端命令出现，不作为 OpenCode tool 出现

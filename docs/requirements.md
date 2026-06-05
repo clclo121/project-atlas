@@ -142,9 +142,19 @@ project-atlas review-summary --repo <repo> --proposal-id <id>
 - 必须输出 Git 基准提交和 `worktree_diff_hash`。
 - 必须识别 Maven 项目信息。
 - 必须识别常见 Java 入口，包括 controller、service、feign、tasks、mq、remote、config。
+- 必须识别常见 Node/TypeScript CLI、MCP、adapter、commands、tools、schema、docs、tests、build/config 入口。
+- 必须输出结构化 `facts`，至少覆盖 package.json bin/scripts/files/exports、MCP tools、adapter assets、schema 和 tests。
 - 必须列出 `knowledge/` 覆盖情况。
+- 候选知识目标必须尽量带上来源文件、置信度和分类，供 Agent 生成证据读取计划。
+- 必须输出结构化 `evidence_plan`，按目标知识文件列出推荐读取文件、证据类型、缺口、原因和置信度。
 - 必须对敏感配置只输出规则类型和文件路径，不输出原文值。
 - 支持通过 `--external-evidence-file` 导入外部代码证据。
+- external evidence 可以携带 `generated_at`、`base_commit`、`tool_version` 和 `coverage_summary`；过期、路径缺失或 base commit 不匹配时必须输出 warning。
+- 支持显式 `--format json`，默认输出仍为 JSON；其他 format 必须明确报错。
+- `scan` 必须输出可被 JSON Schema 描述的公开结果，schema 文件为 `schema/scan-result.schema.json`。
+- `ScanResult.candidates` 必须继续保留 `domains`、`workflows`、`integrations`、`risks`，并可以扩展 `contracts`、`quality` 等新分组。
+- 每个 candidate 可以包含 `source_files`、`confidence` 和 `category`，用于指导生成前的证据读取计划。
+- 每个 candidate 可以包含 `fact_ids`，用于把候选目标和 `facts` 关联起来。
 - 不把外部代码图谱工具作为运行时硬依赖。
 
 ### 5.3 `context`
@@ -172,6 +182,9 @@ project-atlas review-summary --repo <repo> --proposal-id <id>
 - 必须写入 `proposal.json`、`trigger-result.json`、`latest.json` 和 `dry-run.diff`。
 - 必须支持保存外部代码证据。
 - 命中敏感规则时，proposal 状态必须为 `blocked_sensitive`，并且不能保存敏感原文。
+- external evidence 导入必须扫描 `source`、`source_type`、`path`、`symbol`、`summary`、`locator` 中的敏感内容；命中时拒绝导入，错误只暴露字段和规则。
+- `updates-file.updates[]` 可以带可选 `source_files`。单个 update 的 `source_files` 优先用于该目标文件的 frontmatter 和质量预检；顶层 `source_files` 作为默认来源继续兼容旧输入。
+- proposal 必须保存 `evidence_plan_summary` 和 `quality_score`，用于 review-summary 判断每个目标的证据覆盖和内容质量。
 
 ### 5.6 `apply`
 
@@ -192,6 +205,14 @@ project-atlas review-summary --repo <repo> --proposal-id <id>
 
 - 必须输出 Markdown。
 - 必须包含 proposal id、状态、原因、source files、target files、外部证据、敏感扫描结果、stale 状态和下一步命令。
+- 必须展示当前知识库质量 warning 和拟生成内容质量 warning，至少覆盖浅内容、弱证据、缺少实用章节。
+- 如果拟生成内容存在质量 warning，`can_apply` 必须为 `no`，并提示先补证据和实用章节后重新生成 proposal。
+- 必须展示 proposal 的 `evidence_plan_summary`、`quality_score` 和 external evidence warning。
+- 如果 proposal 整体质量分低于 70，`can_apply` 必须为 `no`。
+- 必须展示 `coverage_score` 和 Deep Review Coverage。
+- 如果 proposal 覆盖分低于 70，`can_apply` 必须为 `no`。
+- 必须展示 `update_reason_summary`，帮助 reviewer 判断刷新是否对应稳定知识变化。
+- 必须展示内容质量 warning，帮助 reviewer 识别浅内容、弱证据和缺少实用章节的知识文档。
 - 默认读取 `latest.json`。
 - 支持通过 `--proposal-id` 指定 proposal。
 
@@ -203,8 +224,15 @@ project-atlas review-summary --repo <repo> --proposal-id <id>
 - 可以提供 `/kb-check` 和 `/kb-review`，用于 proposal 生成后的健康检查和审核摘要。
 - 可以提供 `/kb-status`，用于聚合知识库健康状态和 latest proposal 状态。
 - 可以提供 `/kb-remember`，用于沉淀决策、经验和项目事实类 project memory proposal。
-- `/kb-generate` 只能作为 Project Atlas adapter 命令，用 `mode=full` 扫描结果生成首批知识正文 proposal。
+- `/kb-generate` 只能作为 Project Atlas adapter 命令，用 `mode=full`、`reviewDepth=deep` 扫描结果生成首批知识正文 proposal。
 - `/kb-generate` 必须按 `knowledge/` 结构生成，默认采用核心加候选策略，不允许无证据铺满所有目录。
+- `/kb-generate` 和 `/kb-refresh` 可以提示 Agent 在可用时搭配 `code-review-graph` 等外部代码图谱工具做完整代码梳理，并把结果作为 external evidence；该能力不得成为硬依赖。
+- `/kb-generate` 和 `/kb-refresh` 必须提示 Agent 优先消费 `scan.evidence_plan` 和 `scan.review_plan`，再按可选 external evidence 补强读取计划，不能默认全仓读取。
+- `/kb-refresh` 必须要求 Agent 基于 changed files、已有 `source_files`、证据计划覆盖和外部影响半径判断是否存在稳定知识变化，并在 proposal 中写入 `update_reason_summary`。
+- 生成 proposal 时必须做内容质量预检。质量问题只作为 warning 写入 `proposal_quality_findings` 和 review summary，不应在第一阶段阻断人工 apply。
+- 生成 proposal 后必须提醒 reviewer 查看 `quality_score`、`evidence_plan_summary`、`coverage_score`、Deep Review Coverage 和 external evidence warning。
+- scanner 配置扫描、proposal 内容扫描和 external evidence 扫描必须复用同一套敏感规则，避免规则漂移。
+- `/kb-generate` 和 `/kb-refresh` 必须先形成证据读取计划，再读取有限且必要的源码、配置、schema、adapter 和测试文件。
 - `/kb-generate` 生成的每篇正文必须绑定来源文件，并且必须通过 `project_atlas_propose` 进入 proposal。
 - OpenCode adapter 在生成长正文时必须优先使用文件输入，例如 `updatesFile` 或 `target + contentFile`。
 - OpenCode adapter 不应把长中文 Markdown 正文直接放进 tool JSON 参数。

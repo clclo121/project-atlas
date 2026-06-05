@@ -3,11 +3,14 @@ import path from "node:path";
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { buildFrontmatter, ensureKnowledgeFrontmatter, hasFrontmatter, parseFrontmatter, type KnowledgeMetadata } from "./frontmatter.js";
+import { sensitiveRuleMatches } from "./rules.js";
 import { scanRepo } from "./scanner.js";
 import type {
   CheckItem,
   CheckResult,
   ContextItem,
+  CoverageScore,
+  EvidencePlanItem,
   ExternalEvidenceItem,
   LatestIndex,
   MemoryCandidateInput,
@@ -17,6 +20,9 @@ import type {
   Proposal,
   ProposalOperation,
   ProposalStatus,
+  QualityScore,
+  ReviewDepth,
+  SensitiveFinding,
   StaleItem,
   TriggerResult,
 } from "./types.js";
@@ -49,12 +55,19 @@ interface ParsedArgs {
 interface UpdateInput {
   source_files?: string[];
   external_evidence?: ExternalEvidenceItem[];
-  updates: Array<{ target: string; content: string }>;
+  update_reason_summary?: string;
+  updates: UpdateInputItem[];
+}
+
+interface UpdateInputItem {
+  target: string;
+  content: string;
+  source_files?: string[];
 }
 
 const commandOptions: Record<string, string[]> = {
   init: ["repo", "template"],
-  scan: ["repo", "mode", "external-evidence-file"],
+  scan: ["repo", "mode", "external-evidence-file", "format", "review-depth"],
   context: ["repo", "query", "source-file", "budget", "max-context-chars", "format", "memory-type", "topic", "scope"],
   stale: ["repo", "format"],
   propose: ["repo", "target", "content-file", "updates-file", "reason", "inherit-source-metadata", "external-evidence-file"],
@@ -158,15 +171,17 @@ const commandHelp: Record<string, string> = {
     "  project-atlas init --repo /path/to/repo --template java-backend",
   ].join("\n"),
   scan: [
-    "Usage: project-atlas scan --repo <repo> --mode <full|changed> [--external-evidence-file <file>]",
+    "Usage: project-atlas scan --repo <repo> --mode <full|changed> [--format json] [--review-depth <standard|deep>] [--external-evidence-file <file>]",
     "",
     "Options:",
     "  --repo <path>       Git repository path. Defaults to current directory.",
     "  --mode <value>      Scan mode. Use full or changed. Defaults to full.",
+    "  --review-depth <value>  Review planning depth. Use standard or deep. Defaults to standard.",
+    "  --format <value>    Output format. Only json is supported. Defaults to json.",
     "  --external-evidence-file <file>  JSON file with external repo map or code graph evidence.",
     "",
     "Example:",
-    "  project-atlas scan --repo /path/to/repo --mode changed --external-evidence-file evidence.json",
+    "  project-atlas scan --repo /path/to/repo --mode changed --review-depth deep --format json --external-evidence-file evidence.json",
   ].join("\n"),
   context: [
     "Usage: project-atlas context --repo <repo> [--query <text>] [--source-file <path>] [--memory-type <decision|experience|project_fact>] [--topic <text>] [--scope <text>] [--budget <chars>] [--format <markdown|json>]",
@@ -424,8 +439,13 @@ function cmdScan(flags: Record<string, string | boolean>): void {
   if (mode !== "full" && mode !== "changed") {
     throw usageError("scan", "--mode must be full or changed");
   }
+  const format = stringFlag(flags, "format", "json");
+  if (format !== "json") {
+    throw usageError("scan", "--format must be json");
+  }
+  const reviewDepth = reviewDepthFlag(flags, "scan");
   const externalEvidence = loadExternalEvidence(repo, optionalStringFlag(flags, "external-evidence-file"));
-  console.log(JSON.stringify(scanRepo(repo, mode, externalEvidence), null, 2));
+  console.log(JSON.stringify(scanRepo(repo, mode, externalEvidence, reviewDepth), null, 2));
 }
 
 function cmdContext(flags: Record<string, string | boolean>): void {
@@ -699,6 +719,9 @@ function cmdReviewSummary(flags: Record<string, string | boolean>): void {
   const triggerPath = path.join(proposalDir, "trigger-result.json");
   const trigger = existsSync(triggerPath) ? readJson<TriggerResult>(triggerPath) : null;
   const stale = staleItems(repo);
+  const qualityIssues = checkKnowledge(repo).items.filter((item) => item.level === "warning" && ["shallow_document", "weak_evidence", "missing_practical_sections"].includes(item.rule_id));
+  const proposedQualityIssues = proposal.proposal_quality_findings ?? [];
+  const externalEvidenceWarnings = externalEvidenceQualityWarnings(repo, proposal.external_evidence ?? []);
   const safetyStale = stale.filter((item) => !isScaffoldKnowledgeFile(item.path));
   const dryRunSummary = dryRunSummaryLines(path.join(proposalDir, "dry-run.diff"), proposal.target_files);
   const blocked = proposal.proposal_status === "blocked_sensitive" || proposal.sensitive_scan_result === "blocked";
@@ -706,13 +729,17 @@ function cmdReviewSummary(flags: Record<string, string | boolean>): void {
   const hasMissingSource = safetyStale.some((item) => item.status === "missing_source");
   const hasMissingMetadata = safetyStale.some((item) => item.status === "missing_metadata");
   const hasKnowledgeRisk = hasStale || hasMissingSource || hasMissingMetadata;
-  const canApply = proposal.proposal_status === "proposed" && !blocked && !hasKnowledgeRisk;
+  const hasProposedQualityIssues = proposedQualityIssues.length > 0;
+  const hasLowQualityScore = (proposal.quality_score?.score ?? 100) < 70;
+  const hasLowCoverageScore = (proposal.coverage_score?.score ?? 100) < 70;
+  const canApply = proposal.proposal_status === "proposed" && !blocked && !hasKnowledgeRisk && !hasProposedQualityIssues && !hasLowQualityScore && !hasLowCoverageScore;
   const lines = [
     "# Project Atlas Review Summary",
     "",
     `- proposal_id: ${proposal.proposal_id}`,
     `- proposal_status: ${proposal.proposal_status}`,
     `- reason: ${proposal.reason}`,
+    `- update_reason_summary: ${proposal.update_reason_summary ?? "none"}`,
     `- needs_knowledge_update: ${String(trigger?.needs_knowledge_update ?? true)}`,
     `- proposal_hash: ${proposal.proposal_hash}`,
     `- worktree_diff_hash: ${proposal.worktree_diff_hash}`,
@@ -726,8 +753,21 @@ function cmdReviewSummary(flags: Record<string, string | boolean>): void {
     "## External Evidence",
     ...externalEvidenceLines(proposal.external_evidence ?? []),
     "",
+    "## External Evidence Warnings",
+    ...externalEvidenceWarnings.map((item) => `- ${item.path}: ${item.rule_id}; ${item.message}; Suggestion: ${item.suggestion}`),
+    ...(externalEvidenceWarnings.length ? [] : ["- none"]),
+    "",
     "## Sensitive Scan",
     `- result: ${proposal.sensitive_scan_result}`,
+    "",
+    "## Evidence Plan Coverage",
+    ...evidencePlanSummaryLines(proposal.evidence_plan_summary ?? []),
+    "",
+    "## Quality Score",
+    ...qualityScoreLines(proposal.quality_score),
+    "",
+    "## Deep Review Coverage",
+    ...coverageScoreLines(proposal.coverage_score),
     "",
     "## Dry Run Summary",
     ...dryRunSummary,
@@ -735,8 +775,16 @@ function cmdReviewSummary(flags: Record<string, string | boolean>): void {
     "## Stale Status",
     ...stale.map((item) => `- ${item.path}: ${item.status}${item.status !== "fresh" ? `; ${item.suggestion}` : ""}`),
     "",
+    "## Quality Warnings",
+    ...qualityIssues.map((item) => `- ${item.path}: ${item.rule_id}; ${item.message}; Suggestion: ${item.suggestion}`),
+    ...(qualityIssues.length ? [] : ["- none"]),
+    "",
+    "## Proposed Content Warnings",
+    ...proposedQualityIssues.map((item) => `- ${item.path}: ${item.rule_id}; ${item.message}; Suggestion: ${item.suggestion}`),
+    ...(proposedQualityIssues.length ? [] : ["- none"]),
+    "",
     "## Review Decision",
-    `- recommendation: ${reviewDecision(proposal, { hasStale, hasMissingSource, hasMissingMetadata })}`,
+    `- recommendation: ${reviewDecision(proposal, { hasStale, hasMissingSource, hasMissingMetadata, hasLowQualityScore, hasLowCoverageScore })}`,
     "",
     "## Apply Safety",
     `- can_apply: ${canApply ? "yes" : "no"}`,
@@ -744,11 +792,16 @@ function cmdReviewSummary(flags: Record<string, string | boolean>): void {
     `- stale_documents: ${hasStale ? "yes" : "no"}`,
     `- missing_source_documents: ${hasMissingSource ? "yes" : "no"}`,
     `- missing_metadata_documents: ${hasMissingMetadata ? "yes" : "no"}`,
+    `- quality_warnings: ${qualityIssues.length ? "yes" : "no"}`,
+    `- proposed_content_warnings: ${hasProposedQualityIssues ? "yes" : "no"}`,
+    `- low_quality_score: ${hasLowQualityScore ? "yes" : "no"}`,
+    `- low_coverage_score: ${hasLowCoverageScore ? "yes" : "no"}`,
+    `- external_evidence_warnings: ${externalEvidenceWarnings.length ? "yes" : "no"}`,
     "",
     "## Next Step",
     canApply
       ? `- Run: project-atlas apply --repo ${repo} --proposal-id ${proposal.proposal_id} --confirm`
-      : nextReviewStep(proposal, hasKnowledgeRisk),
+      : nextReviewStep(proposal, hasKnowledgeRisk, hasProposedQualityIssues || hasLowQualityScore || hasLowCoverageScore),
     "",
   ];
   console.log(lines.join("\n"));
@@ -980,6 +1033,7 @@ function checkKnowledge(repo: string): CheckResult {
         items.push(checkIssue("error", "stale_source", rel, `source hash changed: ${source}`, "Refresh this memory with project-atlas remember or project-atlas propose."));
       }
     }
+    items.push(...contentQualityIssues(rel, body, metadata.source_files));
     if (metadata.topic) {
       const key = metadata.topic.toLowerCase();
       topicPaths.set(key, [...(topicPaths.get(key) ?? []), rel]);
@@ -1024,6 +1078,162 @@ function checkIssue(level: CheckItem["level"], ruleId: string, pathValue: string
   return { level, rule_id: ruleId, path: pathValue, message, suggestion };
 }
 
+function contentQualityIssues(pathValue: string, body: string, sourceFiles: string[]): CheckItem[] {
+  if (isScaffoldKnowledgeFile(pathValue)) {
+    return [];
+  }
+  const items: CheckItem[] = [];
+  const normalizedBody = body.replace(/```[\s\S]*?```/g, "").trim();
+  const nonEmptyLines = normalizedBody.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const bodyChars = normalizedBody.replace(/\s/g, "").length;
+  if (bodyChars < 160 || nonEmptyLines.length < 4) {
+    items.push(checkIssue("warning", "shallow_document", pathValue, "knowledge document appears too shallow for stable project reuse.", "Add evidence-backed responsibilities, entry points, key files, and change notes."));
+  }
+  if (sourceFiles.length <= 1 && sourceFiles.every((source) => /(^|\/)README\.md$/i.test(source))) {
+    items.push(checkIssue("warning", "weak_evidence", pathValue, "knowledge document only cites README evidence.", "Regenerate with concrete source files such as entry points, schemas, adapter commands, tests, or configs."));
+  }
+  if (!hasPracticalSections(normalizedBody)) {
+    items.push(checkIssue("warning", "missing_practical_sections", pathValue, "knowledge document is missing practical engineering sections.", "Include applicable sections for responsibilities, key entry points, key files, contracts, risks, tests, or change notes."));
+  }
+  return items;
+}
+
+function qualityScoreForUpdates(updateEvidence: Array<{ target: string; content: string; source_files: string[] }>, findings: CheckItem[]): QualityScore {
+  const items = updateEvidence.map((update) => {
+    const deductions: string[] = [];
+    const updateFindings = findings.filter((item) => item.path === update.target);
+    for (const finding of updateFindings) {
+      deductions.push(finding.rule_id);
+    }
+    const evidenceTypes = evidenceTypesForFiles(update.source_files);
+    if (evidenceTypes.size < 2) {
+      deductions.push("narrow_evidence_types");
+    }
+    const score = Math.max(0, 100 - updateFindings.length * 25 - (evidenceTypes.size < 2 ? 15 : 0));
+    return { target: update.target, score, deductions: unique(deductions) };
+  });
+  const score = items.length ? Math.round(items.reduce((total, item) => total + item.score, 0) / items.length) : 100;
+  return { score, rating: score >= 80 ? "good" : score >= 70 ? "warning" : "poor", items };
+}
+
+function coverageScoreForUpdates(
+  updateEvidence: Array<{ target: string; source_files: string[] }>,
+  evidencePlan: EvidencePlanItem[],
+  externalWarnings: CheckItem[],
+): CoverageScore {
+  const warningRules = unique(externalWarnings.map((item) => item.rule_id));
+  const items = updateEvidence.map((update) => {
+    const plan = evidencePlan.find((item) => item.target === update.target);
+    const plannedFiles = plan?.recommended_files ?? update.source_files;
+    const actualFiles = update.source_files;
+    const actualSet = new Set(actualFiles);
+    const missingFiles = plannedFiles.filter((file) => !actualSet.has(file));
+    const missingEvidenceTypes = plan?.missing_evidence ?? requiredEvidenceTypesForTarget(update.target).filter((type) => !evidenceTypesForFiles(actualFiles).has(type) && type !== "source_file");
+    const deductions = unique([
+      ...missingEvidenceTypes.map((type) => `missing_evidence:${type}`),
+      ...(missingFiles.length ? ["missing_planned_files"] : []),
+      ...(actualFiles.length <= 1 ? ["too_few_source_files"] : []),
+      ...(warningRules.length ? ["external_evidence_warnings"] : []),
+    ]);
+    const score = Math.max(0, 100 - missingEvidenceTypes.length * 18 - Math.min(missingFiles.length, 3) * 8 - (actualFiles.length <= 1 ? 15 : 0) - warningRules.length * 10);
+    return {
+      target: update.target,
+      score,
+      planned_files: plannedFiles,
+      actual_files: actualFiles,
+      missing_files: missingFiles,
+      missing_evidence_types: missingEvidenceTypes,
+      external_warnings: warningRules,
+      deductions,
+    };
+  });
+  const score = items.length ? Math.round(items.reduce((total, item) => total + item.score, 0) / items.length) : 100;
+  return { score, rating: score >= 80 ? "good" : score >= 70 ? "warning" : "poor", items };
+}
+
+function evidenceTypesForFiles(files: string[]): Set<string> {
+  const types = new Set<string>();
+  for (const file of files) {
+    if (/(^|\/)README\.md$/i.test(file)) types.add("readme");
+    if (/(^|\/)(package\.json|pom\.xml|tsconfig\.json)$/.test(file)) types.add("build_config");
+    if (/(^|\/)(index|cli|main)\.[cm]?[jt]s$|bin\//.test(file)) types.add("cli_entry");
+    if (/(^|\/)(mcp|server)\.[cm]?[jt]s$|Mcp.*\.java$/.test(file)) types.add("mcp_entry");
+    if (/\/commands\//.test(file)) types.add("adapter_command");
+    if (/\/tools\//.test(file)) types.add("adapter_tool");
+    if (/^schema\/.*\.json$/.test(file)) types.add("schema");
+    if (/(^|\/)(test|tests|__tests__)\/|\.test\.[cm]?[jt]s$|\.spec\.[cm]?[jt]s$|Test\.java$/.test(file)) types.add("tests");
+    if (/^docs\/|(^|\/)(CHANGELOG|CONTRIBUTING|SECURITY|AGENTS)\.md$/i.test(file)) types.add("docs");
+    if (!types.size && file) types.add("source_file");
+  }
+  return types;
+}
+
+function proposalEvidencePlanSummary(updateEvidence: Array<{ target: string; source_files: string[] }>): EvidencePlanItem[] {
+  return updateEvidence.map((update) => {
+    const evidenceTypes = [...evidenceTypesForFiles(update.source_files)].sort();
+    return {
+      target: update.target,
+      candidate_category: categoryFromTarget(update.target),
+      recommended_files: update.source_files,
+      required_evidence_types: requiredEvidenceTypesForTarget(update.target),
+      reason: "proposal source evidence selected for this target",
+      missing_evidence: requiredEvidenceTypesForTarget(update.target).filter((type) => !evidenceTypes.includes(type) && type !== "source_file"),
+      confidence: evidenceTypes.length >= 2 ? 0.8 : 0.55,
+    };
+  });
+}
+
+function updateReasonSummary(repo: string, inputData: UpdateInput, updateEvidence: Array<{ target: string; source_files: string[] }>): string {
+  if (inputData.update_reason_summary?.trim()) {
+    return inputData.update_reason_summary.trim();
+  }
+  const changed = new Set(changedFiles(repo));
+  const changedEvidence = unique(updateEvidence.flatMap((update) => update.source_files).filter((source) => changed.has(source)));
+  if (changedEvidence.length) {
+    return `Stable knowledge update is tied to changed source files: ${changedEvidence.slice(0, 8).join(", ")}.`;
+  }
+  const externalTypes = unique((inputData.external_evidence ?? []).map((item) => item.source_type));
+  if (externalTypes.length) {
+    return `Stable knowledge update is supported by external evidence types: ${externalTypes.slice(0, 6).join(", ")}.`;
+  }
+  const targets = unique(updateEvidence.map((update) => update.target));
+  return `Stable knowledge update covers ${targets.length} target file${targets.length === 1 ? "" : "s"} from explicit source evidence.`;
+}
+
+function requiredEvidenceTypesForTarget(target: string): string[] {
+  if (target.includes("/workflows/cli")) return ["cli_entry", "build_config", "tests"];
+  if (target.includes("/integrations/mcp")) return ["mcp_entry", "schema", "tests"];
+  if (target.includes("/integrations/agent")) return ["adapter_command", "adapter_tool", "docs"];
+  if (target.includes("/contracts/")) return ["schema", "tests"];
+  if (target.includes("/quality/")) return ["tests", "build_config", "docs"];
+  if (target.includes("/project/")) return ["readme", "build_config", "docs"];
+  return ["source_file", "tests"];
+}
+
+function categoryFromTarget(target: string): string {
+  const match = target.match(/^knowledge\/([^/]+)\//);
+  return match?.[1] ?? "knowledge";
+}
+
+function hasPracticalSections(body: string): boolean {
+  const headingText = body
+    .split(/\r?\n/)
+    .filter((line) => /^#{2,4}\s+/.test(line))
+    .join("\n")
+    .toLowerCase();
+  const patterns = [
+    /responsibilit|职责|边界/,
+    /entry point|入口/,
+    /key file|关键文件/,
+    /contract|契约|接口/,
+    /workflow|flow|流程/,
+    /risk|风险/,
+    /test|验证|测试/,
+    /change note|变更/,
+  ];
+  return patterns.filter((pattern) => pattern.test(headingText)).length >= 2;
+}
+
 function markdownRelativeLinks(content: string): string[] {
   const links: string[] = [];
   for (const match of content.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
@@ -1048,30 +1258,46 @@ function createProposal(repo: string, inputData: UpdateInput, reason: string, in
     throw new Error(`duplicate proposal target: ${duplicateTarget}`);
   }
   const inheritedSourceFiles = inheritSourceMetadata ? inheritedSourceFilesForTargets(repo, targetFiles) : [];
-  const sourceFiles = unique([...inheritedSourceFiles, ...(inputData.source_files ?? [])].filter(Boolean).map((source) => validateRepoRelativePath(source, "source_files item")));
+  const defaultSourceFiles = unique([...inheritedSourceFiles, ...(inputData.source_files ?? [])].filter(Boolean).map((source) => validateRepoRelativePath(source, "source_files item")));
+  const updateEvidence = inputData.updates.map((update) => {
+    const updateSourceFiles = update.source_files?.length ? update.source_files.map((source) => validateRepoRelativePath(source, "updates.source_files item")) : defaultSourceFiles;
+    return {
+      target: validateKnowledgeTarget(update.target),
+      content: update.content,
+      source_files: unique(updateSourceFiles),
+    };
+  });
+  const sourceFiles = unique(updateEvidence.flatMap((update) => update.source_files));
   assertSourceFilesExist(repo, sourceFiles);
   const sourceHashes = Object.fromEntries(sourceFiles.map((source) => [source, repoFileHash(repo, source)]));
-  const sensitiveTargets = inputData.updates.filter((update) => hasSensitiveContent(update.content)).map((update) => validateKnowledgeTarget(update.target));
-  const status: ProposalStatus = sensitiveTargets.length ? "blocked_sensitive" : "proposed";
-  if (sensitiveTargets.length) {
+  const proposalQualityFindings = updateEvidence.flatMap((update) => contentQualityIssues(update.target, update.content, update.source_files));
+  const qualityScore = qualityScoreForUpdates(updateEvidence, proposalQualityFindings);
+  const evidencePlanSummary = proposalEvidencePlanSummary(updateEvidence);
+  const proposalExternalEvidence = inputData.external_evidence ?? [];
+  const externalWarnings = externalEvidenceQualityWarnings(repo, proposalExternalEvidence);
+  const coverageScore = coverageScoreForUpdates(updateEvidence, evidencePlanSummary, externalWarnings);
+  const reasonSummary = updateReasonSummary(repo, inputData, updateEvidence);
+  const sensitiveFindings = updateEvidence.flatMap((update) => sensitiveContentFindings(update.target, update.content));
+  const status: ProposalStatus = sensitiveFindings.length ? "blocked_sensitive" : "proposed";
+  if (sensitiveFindings.length) {
     writeJson(path.join(dir, "blocked-sensitive-summary.json"), {
       schema_version: "1.0",
       blocked_at: new Date().toISOString(),
-      items: sensitiveTargets.map((target) => ({ path: target, rule_id: "builtin.secret.generic", rule_category: "secret", action: "blocked_full_diff" })),
+      items: sensitiveFindings,
     });
   }
   const operations: ProposalOperation[] =
     status === "blocked_sensitive"
       ? []
-      : inputData.updates.map((update) => {
-          const target = validateKnowledgeTarget(update.target);
+      : updateEvidence.map((update) => {
+          const updateSourceHashes = Object.fromEntries(update.source_files.map((source) => [source, sourceHashes[source]]));
           const content = ensureKnowledgeFrontmatter(update.content, {
-            source_files: sourceFiles,
-            source_hashes: sourceHashes,
+            source_files: update.source_files,
+            source_hashes: updateSourceHashes,
             generated_by: "project-atlas",
             review_status: "draft",
           });
-          return { type: "replace_file", path: target, content, target_current_hash: repoFileHash(repo, target) };
+          return { type: "replace_file", path: update.target, content, source_files: update.source_files, source_hashes: updateSourceHashes, target_current_hash: repoFileHash(repo, update.target) };
         });
   const proposalBase: Omit<Proposal, "proposal_hash"> = {
     proposal_id: proposalId,
@@ -1085,7 +1311,12 @@ function createProposal(repo: string, inputData: UpdateInput, reason: string, in
     created_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     reason,
-    external_evidence: inputData.external_evidence ?? [],
+    update_reason_summary: reasonSummary,
+    external_evidence: proposalExternalEvidence,
+    evidence_plan_summary: evidencePlanSummary,
+    quality_score: qualityScore,
+    coverage_score: coverageScore,
+    proposal_quality_findings: proposalQualityFindings,
     sensitive_scan_result: status === "blocked_sensitive" ? "blocked" : "passed",
     proposal_status: status,
   };
@@ -1103,16 +1334,38 @@ function loadUpdateInput(repo: string, target?: string, contentFile?: string, up
     if (!Array.isArray(parsed.updates) || parsed.updates.length === 0) {
       throw new Error("updates-file must contain a non-empty updates array.");
     }
+    if (parsed.update_reason_summary !== undefined && typeof parsed.update_reason_summary !== "string") {
+      throw new Error("updates-file update_reason_summary must be a string.");
+    }
     return {
       source_files: validateSourceFiles(parsed.source_files ?? []),
       external_evidence: validateExternalEvidenceItems(parsed.external_evidence ?? []),
-      updates: parsed.updates,
+      update_reason_summary: typeof parsed.update_reason_summary === "string" ? validateFrontmatterScalar(parsed.update_reason_summary, "update_reason_summary") : undefined,
+      updates: validateUpdateItems(parsed.updates),
     };
   }
   if (!target || !contentFile) {
     throw new Error("provide --updates-file or --target with --content-file");
   }
   return { source_files: [], external_evidence: [], updates: [{ target, content: readFileSync(path.resolve(repo, contentFile), "utf8") }] };
+}
+
+function validateUpdateItems(value: unknown): UpdateInputItem[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error("updates-file must contain a non-empty updates array.");
+  }
+  return value.map((raw) => {
+    if (!isRecord(raw)) {
+      throw new Error("updates item must be an object.");
+    }
+    const target = requiredUpdateString(raw, "target");
+    const content = requiredUpdateString(raw, "content");
+    const item: UpdateInputItem = { target, content };
+    if (raw.source_files !== undefined) {
+      item.source_files = validateSourceFiles(raw.source_files, "updates.source_files item");
+    }
+    return item;
+  });
 }
 
 function loadMemoryCandidate(repo: string, candidateFile: string): MemoryCandidateInput {
@@ -1197,7 +1450,7 @@ function memoryCandidateToUpdateInput(repo: string, candidate: MemoryCandidateIn
   return { source_files: candidate.source_files, external_evidence: [], updates };
 }
 
-function validateSourceFiles(value: unknown): string[] {
+function validateSourceFiles(value: unknown, itemLabel = "source_files item"): string[] {
   if (!Array.isArray(value)) {
     throw new Error("source_files must be an array.");
   }
@@ -1205,7 +1458,7 @@ function validateSourceFiles(value: unknown): string[] {
     if (typeof source !== "string" || !source.trim()) {
       throw new Error("source_files items must be strings.");
     }
-    return validateRepoRelativePath(source, "source_files item");
+    return validateRepoRelativePath(source, itemLabel);
   });
 }
 
@@ -1287,6 +1540,16 @@ function validateExternalEvidenceItems(value: unknown): ExternalEvidenceItem[] {
         item[field] = valueForField;
       }
     }
+    for (const field of ["generated_at", "base_commit", "tool_version", "coverage_summary"] as const) {
+      const valueForField = raw[field];
+      if (valueForField !== undefined) {
+        if (typeof valueForField !== "string") {
+          throw new Error(`external_evidence item ${field} must be a string.`);
+        }
+        item[field] = valueForField;
+      }
+    }
+    assertExternalEvidenceHasNoSensitiveContent(item);
     if (raw.confidence !== undefined) {
       if (typeof raw.confidence !== "number" || raw.confidence < 0 || raw.confidence > 1) {
         throw new Error("external_evidence item confidence must be a number between 0 and 1.");
@@ -1297,12 +1560,33 @@ function validateExternalEvidenceItems(value: unknown): ExternalEvidenceItem[] {
   });
 }
 
+function assertExternalEvidenceHasNoSensitiveContent(item: ExternalEvidenceItem): void {
+  for (const field of ["source", "source_type", "path", "symbol", "summary", "locator", "generated_at", "base_commit", "tool_version", "coverage_summary"] as const) {
+    const value = item[field];
+    if (!value) {
+      continue;
+    }
+    const match = sensitiveRuleMatches(value)[0];
+    if (match) {
+      throw new Error(`external_evidence item ${field} contains sensitive content: ${match.rule_id}`);
+    }
+  }
+}
+
 function requiredString(record: Record<string, unknown>, field: string): string {
   const value = record[field];
   if (typeof value !== "string" || !value.trim()) {
     throw new Error(`external_evidence item ${field} is required.`);
   }
   return value.trim();
+}
+
+function requiredUpdateString(record: Record<string, unknown>, field: string): string {
+  const value = record[field];
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`updates item ${field} is required.`);
+  }
+  return value;
 }
 
 function requiredMemoryString(record: Record<string, unknown>, field: string): string {
@@ -1398,10 +1682,19 @@ function dryRunSummaryLines(diffPath: string, targetFiles: string[]): string[] {
 
 function reviewDecision(
   proposal: Proposal,
-  risk: { hasStale: boolean; hasMissingSource: boolean; hasMissingMetadata: boolean },
+  risk: { hasStale: boolean; hasMissingSource: boolean; hasMissingMetadata: boolean; hasLowQualityScore?: boolean; hasLowCoverageScore?: boolean },
 ): string {
   if (proposal.proposal_status === "blocked_sensitive" || proposal.sensitive_scan_result === "blocked") {
     return "blocked by sensitive content; do not apply.";
+  }
+  if ((proposal.proposal_quality_findings ?? []).length) {
+    return "proposed content has quality warnings; regenerate with stronger evidence before apply.";
+  }
+  if (risk.hasLowQualityScore) {
+    return "proposed content quality score is too low; regenerate with stronger evidence before apply.";
+  }
+  if (risk.hasLowCoverageScore) {
+    return "proposed content coverage score is too low; add planned files, missing evidence types, or fresh external evidence before apply.";
   }
   if (risk.hasMissingSource) {
     return "missing source files must be restored or reviewed before apply.";
@@ -1418,9 +1711,12 @@ function reviewDecision(
   return `no apply action for status ${proposal.proposal_status}.`;
 }
 
-function nextReviewStep(proposal: Proposal, hasKnowledgeRisk: boolean): string {
+function nextReviewStep(proposal: Proposal, hasKnowledgeRisk: boolean, hasProposedQualityIssues = false): string {
   if (proposal.proposal_status !== "proposed") {
     return `- No apply command is available for status ${proposal.proposal_status}.`;
+  }
+  if (hasProposedQualityIssues) {
+    return "- Resolve proposed content warnings by adding stronger source evidence and practical sections, then regenerate the proposal.";
   }
   if (hasKnowledgeRisk) {
     return "- Resolve stale, missing source, or missing metadata items, then regenerate the proposal.";
@@ -1466,12 +1762,16 @@ function inheritedSourceFilesForTargets(repo: string, targetFiles: string[]): st
 }
 
 function hasSensitiveContent(content: string): boolean {
-  return [
-    /password\s*[:=]\s*\S{3,}/i,
-    /token\s*[:=]\s*\S{8,}/i,
-    /accessKey(Id|Secret)?\s*[:=]\s*\S{8,}/i,
-    /secret\s*[:=]\s*\S{8,}/i,
-  ].some((rule) => rule.test(content));
+  return sensitiveRuleMatches(content).length > 0;
+}
+
+function sensitiveContentFindings(pathValue: string, content: string): SensitiveFinding[] {
+  return sensitiveRuleMatches(content).map((rule) => ({
+    path: pathValue,
+    rule_id: rule.rule_id,
+    rule_category: rule.rule_category,
+    action: "blocked_full_diff",
+  }));
 }
 
 function globFiles(repo: string, dir: string, suffixes: string[]): string[] {
@@ -1503,6 +1803,48 @@ function listOrNone(items: string[]): string[] {
   return items.length ? items.map((item) => `- ${item}`) : ["- none"];
 }
 
+function evidencePlanSummaryLines(items: EvidencePlanItem[]): string[] {
+  if (!items.length) {
+    return ["- none"];
+  }
+  return items.map((item) => {
+    const missing = item.missing_evidence.length ? `; missing: ${item.missing_evidence.join(", ")}` : "";
+    return `- ${item.target}: files=${item.recommended_files.length}; required=${item.required_evidence_types.join(", ")}${missing}; confidence=${item.confidence}`;
+  });
+}
+
+function qualityScoreLines(score?: QualityScore): string[] {
+  if (!score) {
+    return ["- none"];
+  }
+  return [
+    `- overall: ${score.score}`,
+    `- rating: ${score.rating}`,
+    ...score.items.map((item) => `- ${item.target}: ${item.score}${item.deductions.length ? `; deductions: ${item.deductions.join(", ")}` : ""}`),
+  ];
+}
+
+function coverageScoreLines(score?: CoverageScore): string[] {
+  if (!score) {
+    return ["- none"];
+  }
+  return [
+    `- overall: ${score.score}`,
+    `- rating: ${score.rating}`,
+    ...score.items.map((item) => {
+      const details = [
+        `planned_files=${item.planned_files.length}`,
+        `actual_files=${item.actual_files.length}`,
+        item.missing_files.length ? `missing_files=${item.missing_files.join(", ")}` : "",
+        item.missing_evidence_types.length ? `missing_evidence=${item.missing_evidence_types.join(", ")}` : "",
+        item.external_warnings.length ? `external_warnings=${item.external_warnings.join(", ")}` : "",
+        item.deductions.length ? `deductions=${item.deductions.join(", ")}` : "",
+      ].filter(Boolean);
+      return `- ${item.target}: ${item.score}; ${details.join("; ")}`;
+    }),
+  ];
+}
+
 function externalEvidenceLines(items: ExternalEvidenceItem[]): string[] {
   if (!items.length) {
     return ["- none"];
@@ -1513,8 +1855,34 @@ function externalEvidenceLines(items: ExternalEvidenceItem[]): string[] {
     if (item.summary) details.push(item.summary);
     if (item.locator) details.push(`locator: ${item.locator}`);
     if (item.confidence !== undefined) details.push(`confidence: ${item.confidence}`);
+    if (item.generated_at) details.push(`generated_at: ${item.generated_at}`);
+    if (item.base_commit) details.push(`base_commit: ${item.base_commit}`);
+    if (item.tool_version) details.push(`tool_version: ${item.tool_version}`);
+    if (item.coverage_summary) details.push(`coverage: ${item.coverage_summary}`);
     return `- ${details.join(" | ")}`;
   });
+}
+
+function externalEvidenceQualityWarnings(repo: string, items: ExternalEvidenceItem[]): CheckItem[] {
+  const warnings: CheckItem[] = [];
+  const head = currentCommit(repo);
+  for (const item of items) {
+    if (item.path && !existsSync(path.join(repo, item.path))) {
+      warnings.push(checkIssue("warning", "external_evidence_missing_path", item.path, `external evidence path is missing: ${item.path}`, "Regenerate external evidence from the current repository."));
+    }
+    if (item.base_commit && head && item.base_commit !== head) {
+      warnings.push(checkIssue("warning", "external_evidence_base_commit_differs", item.path, "external evidence base_commit differs from current HEAD.", "Regenerate or mark the evidence as intentionally reused."));
+    }
+    if (item.generated_at) {
+      const generatedAt = Date.parse(item.generated_at);
+      if (Number.isNaN(generatedAt)) {
+        warnings.push(checkIssue("warning", "external_evidence_invalid_generated_at", item.path, "external evidence generated_at is not a valid date.", "Use an ISO date-time value."));
+      } else if (Date.now() - generatedAt > 7 * 24 * 60 * 60 * 1000) {
+        warnings.push(checkIssue("warning", "external_evidence_stale", item.path, "external evidence is older than 7 days.", "Regenerate evidence before using it for deep knowledge generation."));
+      }
+    }
+  }
+  return warnings;
 }
 
 function truncate(value: string, budget: number): { text: string; budget_used: number; truncated: boolean } {
@@ -1653,6 +2021,14 @@ function formatFlag(flags: Record<string, string | boolean>, command: string): O
     throw usageError(command, "--format must be markdown or json");
   }
   return format;
+}
+
+function reviewDepthFlag(flags: Record<string, string | boolean>, command: string): ReviewDepth {
+  const value = stringFlag(flags, "review-depth", "standard");
+  if (value === "standard" || value === "deep") {
+    return value;
+  }
+  throw usageError(command, "--review-depth must be standard or deep");
 }
 
 function optionalMemoryTypeFlag(flags: Record<string, string | boolean>, command: string): MemoryType | undefined {

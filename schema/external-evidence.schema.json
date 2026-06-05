@@ -41,6 +41,18 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "base_commit": {
+            "type": "string"
+          },
+          "tool_version": {
+            "type": "string"
+          },
+          "coverage_summary": {
+            "type": "string"
           }
         }
       }
@@ -77,6 +89,18 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "generated_at": {
+          "type": "string"
+        },
+        "base_commit": {
+          "type": "string"
+        },
+        "tool_version": {
+          "type": "string"
+        },
+        "coverage_summary": {
+          "type": "string"
         }
       }
     }

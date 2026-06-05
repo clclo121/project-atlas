@@ -92,6 +92,14 @@ When you refresh an existing knowledge file and need to keep its old evidence sc
 project-atlas propose --repo <repo> --updates-file updates.json --reason "<why>" --inherit-source-metadata
 ```
 
+### Evidence-Driven Generation
+
+`/kb-generate` and `/kb-refresh` run `project_atlas_scan` first with deep review planning, then use `scan.evidence_plan` as the primary reading plan and `scan.review_plan` as the review checklist. They can use `scan.facts`, candidate `source_files`, and external evidence to fill gaps. Prefer README files, package/build config, CLI entries, MCP entries, adapter commands and tools, schemas, core implementation files, tests, and files listed by the evidence or review plan.
+
+If `code-review-graph` or similar code graph tooling is available, use it to summarize structure, impact radius, key nodes, and test gaps, then pass the result through `externalEvidenceFile` on `project_atlas_scan`. This is optional evidence enrichment, not a hard dependency.
+
+After generation, check `Quality Score`, `Evidence Plan Coverage`, `Deep Review Coverage`, external evidence warnings, and quality warnings in `/kb-review`. Do not rush human apply when proposed content is shallow, cites only README evidence, has a low quality or coverage score, or lacks practical sections such as responsibilities, entry points, key files, and change notes.
+
 ### Capture Decisions, Experience, And Facts
 
 Use this when the task produced stable information that should live as project memory:
@@ -184,6 +192,6 @@ adapters/opencode/skills
 - Run `/kb-status` and confirm it reports knowledge health and latest proposal status
 - Run `/kb-remember` and confirm it creates only a proposal
 - Confirm `/kb-generate` does not write `knowledge/**` directly and does not expose apply
-- Confirm no `project_atlas_apply` tool exists
+- Confirm no OpenCode apply tool exists
 - Confirm the proposal output tells the user to run `project-atlas apply` in a terminal
 - Confirm batch apply is documented as a terminal command, not an OpenCode tool
