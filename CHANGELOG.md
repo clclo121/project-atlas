@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.4 - 2026-06-08
+
 - Added a public scan result schema with enriched candidate metadata and new `contracts` and `quality` candidate groups while keeping legacy candidate groups compatible.
 - Expanded `scan` discovery for TypeScript CLI, MCP, adapters, schemas, docs, tests, build files, external evidence, and sensitive config rules.
 - Added proposal content quality warnings for shallow documents, weak evidence, and missing practical sections.
