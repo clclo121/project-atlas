@@ -117,6 +117,12 @@ npm whoami
 npm run release:npm
 ```
 
+如果账号开启了 npm 2FA，直接把一次性验证码一起带上：
+
+```bash
+npm run release:npm -- --otp=123456
+```
+
 这个脚本会自动完成这些动作：
 
 - 检查工作区是否干净
@@ -127,6 +133,8 @@ npm run release:npm
 - 执行 `npm publish`
 - 做发布后校验
 - 创建并推送版本 tag
+
+如果脚本已经跑到 `npm publish` 才因为 `EOTP` 失败，不需要手工拆完整流程。重新执行一遍带 `--otp` 的命令即可，脚本会再次校验并继续正式发布。
 
 如果你只想先跑校验，不真正发布，执行：
 

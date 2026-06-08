@@ -117,6 +117,12 @@ Once the working tree is clean and verification has passed, run:
 npm run release:npm
 ```
 
+If the npm account uses 2FA, pass the one-time password in the same command:
+
+```bash
+npm run release:npm -- --otp=123456
+```
+
 This script automates these steps:
 
 - verify a clean working tree
@@ -127,6 +133,8 @@ This script automates these steps:
 - run `npm publish`
 - run post-publish checks
 - create and push the release tag
+
+If the script already reached `npm publish` and failed with `EOTP`, you do not need to split the flow manually. Re-run the same command with `--otp` and let the script repeat verification and finish the publish flow.
 
 If you only want to run checks without publishing, use:
 

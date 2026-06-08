@@ -11,15 +11,18 @@ const repoRoot = path.resolve(__dirname, "..");
 
 process.chdir(repoRoot);
 
-const args = new Set(process.argv.slice(2));
+const rawArgs = process.argv.slice(2);
+const args = new Set(rawArgs);
+const otp = parseOptionValue(rawArgs, "--otp");
 
 if (args.has("--help") || args.has("-h")) {
-  console.log(`Usage: node scripts/release-npm.mjs [--verify-only] [--skip-global-install-check] [--skip-tag]
+  console.log(`Usage: node scripts/release-npm.mjs [--verify-only] [--skip-global-install-check] [--skip-tag] [--otp <code>]
 
 Options:
   --verify-only               Run release checks only. Do not push, publish, or tag.
   --skip-global-install-check Skip npm install -g and post-publish CLI smoke checks.
   --skip-tag                  Skip git tag creation and tag push after publish.
+  --otp <code>                Pass the npm 2FA one-time password to npm publish.
 
 This script assumes the release version has already been written to package.json and CHANGELOG.md.`);
   process.exit(0);
@@ -53,6 +56,24 @@ const verifyCommands = [
 function fail(message) {
   console.error(`release-npm: ${message}`);
   process.exit(1);
+}
+
+function parseOptionValue(argv, optionName) {
+  const inlineArg = argv.find((arg) => arg.startsWith(`${optionName}=`));
+  if (inlineArg) {
+    return inlineArg.slice(optionName.length + 1);
+  }
+
+  const optionIndex = argv.indexOf(optionName);
+  if (optionIndex === -1) {
+    return null;
+  }
+
+  const nextArg = argv[optionIndex + 1];
+  if (!nextArg || nextArg.startsWith("--")) {
+    fail(`${optionName} requires a value.`);
+  }
+  return nextArg;
 }
 
 function run(command, commandArgs, extraOptions = {}) {
@@ -208,7 +229,11 @@ if (aheadCount > 0) {
 }
 
 console.log("release-npm: running npm publish");
-run("npm", ["publish"]);
+const publishArgs = ["publish"];
+if (otp) {
+  publishArgs.push("--otp", otp);
+}
+run("npm", publishArgs);
 runPostPublishChecks();
 
 if (!skipTag) {
